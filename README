@@ -1,0 +1,33 @@
+Introduction:
+
+splice_detection is a program which detects splicing in RNA sequencing data. It looks for reads which do not match the genome continuously by trying to find two distinct parts in any given read(part A and part B). In part A, it accepts relatively low mismatch rates without many mismatches in a row, while in part B it accepts high mismatch rates. If part B matches the genome closely at another location, this is accepted as a possible splice. If these conditions are not met the read is rejected as a possible splice.
+
+
+This program does not rely on specific biological information. It does not consider what a typical intron or exon for a specific host looks like, nor does it use information specific to enzymes for a particular organism or group of organism involved in splicing. For this reason, it may be able to detect splicing events that other methods could miss. splice_detection is currently not suited for genome-wide analysis of prokaryotic or eukaryotic organisms. As a result of this naive approach, the run time is greatly affected by the length of the input genome or gene since it is computationally more expensive. For this reason, this program is best suited for genome-wide analysis of viruses and viroids and for the examination of specific genes in the case of prokarytoic or eukaryotic organisms.
+
+
+Typical Usage:
+
+The general steps for a typical use of the program are listed below. See the man page for detailed information on user-specifiable options.
+
+1) Preprocessing of RNA sequencing data
+
+Adaptor sequences must be removed from any sequencing data before analysis by splice_detection. In the case of viruses or viroids, it is also recommended to subtract all host derived reads. The final file used for splice_detection should contain a single read per line. This is perhaps easiest accomplished by converting from a FASTA file using sed: "sed -n 'n;p' reads.fa > reads_final". 
+
+2) Generate list of possible splicing events
+
+splice_detection takes as required input a file containing one read per line. It will output results in CSV format which can be redirected into a file or piped directly to another program. Below is an example using ten threads with reads in a file called "reads_final_sample_01", an input gene of interest located in "gene_of_interest". The output file will be located in "sample_01_splices.csv".
+
+splice_detection -t 10 -i reads_final_sample_01 -g gene_of_interest.fa > sample_01_splices.csv
+
+
+3) Data analysis
+
+The final output by splice_detection will be in CSV format containing the following information:
+
+sequence of read, location of donor in input gene or genome, location of acceptor in input gene or genome, location of splice within read
+
+This information can be easily parsed or can for example be visualized in histogram format. 
+	
+
+

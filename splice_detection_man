@@ -1,0 +1,70 @@
+.\" Manpage for splice_detection.
+.TH man 1 "21 August 2014" "0.1" "splice_detection man page"
+
+.SH NAME
+splice_detection \- detect splicing in RNA sequencing data
+
+.SH SYNOPSIS
+splice_detection \-i inputfile \-g genome [options]
+
+.SH DESCRIPTION
+splice_detection is a program which detects splicing in RNA sequencing data. It looks for reads which do not match the genome continously by trying to find two distinct parts in any given read(part A and part B). In part A, it accepts relatively low mismatch rates without many mismatches in a row, while in part B it accepts high mismatch rates. If part B matches the genome closely at another location, this is accepted as a possible splice. If these conditions are not met the read is rejected as a possible splice.
+
+
+
+.SH OPTIONS
+
+.TP
+.BI \-i,\-\-input " file_name" 
+input file containing reads from sequencing. This file should contain each read on a single line.
+
+.TP
+.BI \-g,\-\-genome " file_name"
+input file containing the genome or gene of interest. The runtime of splice_detection will be greatly increased as this file becomes larger.
+
+.TP
+.BI \-l,\-\-status_log " file_name"
+create current status log file. The number of currently processed reads will be written to file specified in increments of 10,000 reads.
+
+.TP
+.BI \-t,\-\-threads " integer"
+specify number of processes (threads) to use for execution.
+
+.TP
+.BI \-s,\-\-seed_len " integer" 
+set initial seed length which must match the genome exactly for any given location. 
+
+.TP
+.BI \-\-partA_min_len " integer" 
+minimum length for part A of reads.
+
+.TP
+.BI \-\-partB_min_len " integer" 
+minimum length for part B of reads.
+
+.TP
+.BI \-\-mM1_roof " float" 
+highest mismatch rate for part A which will not result in rejection. This value must be between zero and one.
+
+.TP
+.BI \-\-mM2_floor " float" 
+lowest mismatch rate for part B which will not result in rejection. This value must be between zero and one.
+
+.TP
+.BI \-\-mMs " integer"
+.br
+largest amount of mismatches in a row for part A which will not result in rejection.
+
+.TP
+.BI \-\-last_n_len " integer"
+number of bases to examine to calculate the mismatch rate in the last N bases.
+
+.TP
+.BI "\-\-mM_last_n " float
+highest mismatch rate for part A in the last N (specified by \-\-last_n_len) bases which will not result in rejection.
+
+
+
+
+.SH AUTHORS
+Matthew Martin <matthew@mttmartin.com>
