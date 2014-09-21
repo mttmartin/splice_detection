@@ -7,12 +7,6 @@
 #include <pthread.h>
 #endif
 
-#ifdef MPI
-#include <mpi.h>
-#include <time.h>
-#include <unistd.h>
-#endif
-
 #define BUFFER_MAX 1024
 
 
@@ -397,59 +391,6 @@ void *pthread_worker (void *data)
 }
 #endif
 
-#ifdef MPI
-void slave(char *genome, struct ParamContainer paramcontainer)
-{
-    int a=0;
-    MPI_Status status;
-    char get[1024];
-
-    while (1)
-    {
-        MPI_Recv(&get, 1024, MPI_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        if (status.MPI_TAG == 42)
-            break;
-        check_for_splice(get, genome, paramcontainer);
-        
-        MPI_Send(&a, 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
-    }
-    MPI_Send(&a, 1, MPI_INT, 0, 42, MPI_COMM_WORLD);
-}
-
-void master(int world_size, char *file_loc)
-{
-    int a=0;
-    char test[world_size-1][1024];
-    fpos_t last_pos = 0;
-    printf("read, loc1, loc2, splice_loc\n");
-    
-    do
-    {
-        last_pos = get_next_sequences(file_loc, world_size-1, test, last_pos);
-
-        int i;
-        for (i=1; i < world_size; ++i)
-        {
-            MPI_Send(&test[i-1], 1024, MPI_CHAR, i, 0, MPI_COMM_WORLD);
-            
-        }
-        
-        for (i=1; i < world_size; ++i)
-        {
-            MPI_Recv(&a, 1, MPI_INT, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        }
-        if (last_pos == 0)
-            break;
-        
-    } while (1);
-    int i;
-    for (i=1; i < world_size; ++i)
-        MPI_Send(&test[1], 1, MPI_CHAR, i, 42, MPI_COMM_WORLD);
-    for (i=1; i < world_size; ++i)
-        MPI_Recv(&a, 1, MPI_INT, MPI_ANY_SOURCE, 42, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    
-}
-#endif
 
 #ifdef SEQ
 void sequential(char *read_loc, char *genome, struct ParamContainer paramcontainer)
@@ -482,10 +423,6 @@ void sequential(char *read_loc, char *genome, struct ParamContainer paramcontain
 int main(int argc, char *argv[])
 {
 	double current_version = 0.1;
-#ifdef MPI
-    int world_size;
-    int world_rank;
-#endif
 	char *file_loc = NULL;
 	char *genome = NULL;
 	char *status_log_file_loc = NULL;
@@ -617,23 +554,6 @@ int main(int argc, char *argv[])
 	}
 	
 
-#ifdef MPI
-    MPI_Init(NULL,NULL);
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-
-    
-    if (world_rank != 0)
-    {
-        slave(genome, paramcontainer);
-        
-    }
-    else if (world_rank == 0)
-    {
-
-        master(world_size, file_loc);
-    }
-#endif
 
 #ifdef PTHREADS
 	printf("read, loc1, loc2, splice_loc\n");
@@ -740,8 +660,4 @@ int main(int argc, char *argv[])
     
     free(genome);
 
-#ifdef MPI
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Finalize();
-#endif
 }
