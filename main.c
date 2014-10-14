@@ -47,8 +47,7 @@ int count = 0;
 int term = 0;
 int finished = 0;
 
-#define MAX_QUEUE_SIZE 3
-#define THREAD_NUM 3
+int max_queue_size=0;
 char **read_queue;
 #endif
 
@@ -130,13 +129,22 @@ fpos_t get_next_sequences(char *file_name, int number, char buffers[][1024], fpo
     {
         if (fgets(line_buffer,1024,f) != NULL)
         {
+			//fprintf(stderr, "string:%s", line_buffer);
             strncpy_to_newline(buffers[i], line_buffer, strlen(line_buffer));
         }
         else
+		{
+			while (i <= number)
+			{
+				*buffers[i] = '\0';
+				i++;
+			}
             return 0;
+		}
     }
     
     fgetpos(f, &current_pos);
+	//printf("current_pos:%lli", current_pos);
     fclose(f);
     return current_pos;
 }
@@ -258,7 +266,7 @@ int determine_splice_loc(char *seq, char *chunk, struct ParamContainer paramcont
 
 void check_for_splice(char *read, char *genome, struct ParamContainer paramcontainer)
 {
-	//printf("Seq:%s\n", read);
+	fprintf(stderr, "check_for_splice-->Seq:%s\n", read);
     unsigned long read_len = strlen(read);
    
     int i;
@@ -351,7 +359,7 @@ void *pthread_worker (void *data)
 		}
 
 		pthread_mutex_lock(&queue_mutex);
-		if (count == MAX_QUEUE_SIZE)
+		if (count > max_queue_size)
 		{
 			//printf("finished...\n");
 			count = 0;
@@ -371,6 +379,12 @@ void *pthread_worker (void *data)
 
 		// tmp created to ensure read is null terminated
 		char *read = read_queue[count];
+		if ((read == NULL) || (*read == '\0'))
+		{
+			pthread_mutex_unlock(&queue_mutex);
+			count++;
+			return NULL;
+		}
 		char *tmp = malloc(sizeof(char)*strlen(read)+2);
 		memset(tmp, '\0', strlen(read)+1);
 		memcpy(tmp, read, strlen(read)+1);
@@ -378,11 +392,7 @@ void *pthread_worker (void *data)
 		count++;
 		pthread_mutex_unlock (&queue_mutex);
 		//printf("count:%i\n", count);
-		if (read == NULL)
-		{
-			fprintf(stderr, "returning NULL\n");
-			return NULL;
-		}
+
 		//printf("Checking:%s", read);
 		check_for_splice (tmp, p_args->genome, p_args->paramcontainer);
 		free(tmp);
@@ -392,33 +402,6 @@ void *pthread_worker (void *data)
 #endif
 
 
-#ifdef SEQ
-void sequential(char *read_loc, char *genome, struct ParamContainer paramcontainer)
-{
-    int process_num = 5;
-    char reads[process_num][1024];
-    fpos_t last_pos = 0;
-    while (1)
-    {
-        last_pos = get_next_sequences(read_loc, process_num-1, reads, last_pos);
-	//printf("here\n");
-        int i;
-	//printf("Seq:%s", reads[0]);
-	//check_for_splice(reads[0], genome, paramcontainer);
-        for (i=1; i < process_num; ++i)
-	{
-           //printf("here1\n"); 
-	   //printf("string:%s", reads[i]);
-	   check_for_splice(reads[i], genome, paramcontainer);
-           //printf("here2\n");
-	}
-        if (last_pos == 0)
-            break;
-    }
-    
-    
-}
-#endif
 
 int main(int argc, char *argv[])
 {
@@ -429,7 +412,7 @@ int main(int argc, char *argv[])
 	FILE *status_log_file = NULL;
 	int log_interval = 1000;
 	
-	int thread_num = 10;
+	int thread_num = 2;
     struct ParamContainer paramcontainer;
     
     paramcontainer.seed_len = 3;
@@ -561,103 +544,84 @@ int main(int argc, char *argv[])
 	struct timespec ts1, ts2;
 	ts1.tv_sec = 0;
 	ts1.tv_nsec = 500000L;
-	int max_queue_size = thread_num;
+	max_queue_size = thread_num;
 	struct pthread_args *args = malloc(sizeof(struct pthread_args));
 	args->genome = genome;
 	args->paramcontainer = paramcontainer;
 
-	//int thread_num = 10;
-	//char *genome = "1234";
 	pthread_t thread_id[thread_num];
 	read_queue = (char**)malloc(1+max_queue_size * sizeof(char*));
 	
-	for (i=0; i < max_queue_size; ++i)
+	for (i=0; i <= max_queue_size; ++i)
 		read_queue[i] = malloc(sizeof(char)*1024);
 
 
 	for (i=0; i < thread_num; i++)
 	{
-		fprintf(stderr, "Creating thread:%i\n", i);
+		//fprintf(stderr, "Creating thread:%i\n", i);
 		pthread_create (&thread_id[i], NULL, pthread_worker,  (void*)args);
 	}
-	i=0;
+	
 	int j;
+	int log_iter=0;
+	int total_processed_reads=0;
 	fpos_t last_pos=1;
 	char out_queue[max_queue_size][1024];
+	
+	int loop_num = 0;
+
+
+	printf("max_queue_size:%i\n", max_queue_size);
 	while (1)
 	{
-		if (status_log_file_loc)
+		printf("starting loop:%i\n",loop_num);
+		loop_num++;
+
+		if ((status_log_file_loc) && (log_iter > log_interval))
 		{
-			if (i > log_interval)
-			{
-				status_log_file = fopen(status_log_file_loc, "w");
-				fprintf(status_log_file, "%i\n", (i*max_queue_size));
-				fclose(status_log_file);
-				i = 0;
-			}
+			status_log_file = fopen(status_log_file_loc, "w");
+			fprintf(status_log_file, "%i\n", (loop_num*max_queue_size));
+			fclose(status_log_file);
+			log_iter = 0;
 		}
-		
+		log_iter++;
+
 		last_pos = get_next_sequences(file_loc, max_queue_size, out_queue, last_pos);
-		//printf("got seqs\n");
-		if (last_pos == 0)
-		{
-			fprintf(stderr, "setting term=1\n");
-			term=1;
-			pthread_cond_broadcast(&start_cond);
-			break;
-		}
 
-		
-		for (j=0; j < max_queue_size; ++j)
-		{
 
+		for (j=0; j <= max_queue_size; ++j)
+		{
 			memset(read_queue[j], '\0', 1024);
-			strncpy (read_queue[j], out_queue[j], strlen(out_queue[j])+1);
+			strncpy (read_queue[j], out_queue[j], strlen(out_queue[j]));
+			//printf("read:%s\n", out_queue[j]);
 		}
-		//printf("broadcasting start cond\n");
+	
 		pthread_cond_broadcast(&start_cond);
-		//printf("getting finished_mutex\n");
-		
 		nanosleep(&ts1, &ts2);
-
 		pthread_mutex_lock(&finished_mutex);
-		//printf("got finished-mutex\n");
-		//printf("cond_wait finished_cond\n");
 		while (finished == 0)
 			pthread_cond_wait(&finished_cond, &finished_mutex);
-		
-		//printf("releaseing finished_mutex\n");
-		pthread_mutex_unlock(&finished_mutex);
-		
-		
-	//	usleep(100);
-		
-		i++;
-	}
 
+		pthread_mutex_unlock(&finished_mutex);
+		if (last_pos == 0)
+		{
+			fprintf(stderr, "Got last batch of sequences\n");
+			break;
+		}
+	}
+	
 
 
 	for (i=0; i < thread_num; i++)
 	{
-		fprintf(stderr, "Joining thread:%i\n", i);
+		//fprintf(stderr, "Joining thread:%i\n", i);
 		pthread_join(thread_id[i], NULL);
 	}
-	free(args);
+#endif
+
+
 	
-/*	for (i=0; i < MAX_QUEUE_SIZE; ++i)
-		free (read_queue[i]);
-	free(read_queue);*/
-
-
-
-
-#endif
-
-    
-#ifdef SEQ
-    sequential(file_loc, genome, paramcontainer);
-#endif
-    
+	free (read_queue);
     free(genome);
 
 }
