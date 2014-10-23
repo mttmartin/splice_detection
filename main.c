@@ -112,41 +112,50 @@ char* get_genome(char *filename)
 
 fpos_t get_next_sequences(char *file_name, int number, char buffers[][1024], fpos_t last_pos)
 {
-    FILE *f = fopen(file_name, "r");
-    fpos_t current_pos;
+	FILE *f = fopen(file_name, "r");
+	fpos_t current_pos;
     
-    if (f == NULL)
-    {
-        perror("Error opening sequence file");
-        return 0;
-    }
+	if (f == NULL)
+	{
+		perror("Error opening sequence file");
+		return 0;
+	}
     
-    fsetpos(f, &last_pos);
-    
-    int i;
-    char line_buffer[1024] = {'\0'};
-    for (i=0; i <= number; i++)
-    {
-        if (fgets(line_buffer,1024,f) != NULL)
-        {
-			//fprintf(stderr, "string:%s", line_buffer);
-            strncpy_to_newline(buffers[i], line_buffer, strlen(line_buffer));
+	fsetpos(f, &last_pos);
+
+	int i;
+	char line_buffer[1024] = {'\0'};
+	for (i=0; i <= number; i++)
+	{
+		if (fgets(line_buffer,1024,f) != NULL)
+		{
+			switch (line_buffer[0])
+			{
+				case '>':
+				case ';':
+				{
+					i--;
+					break;
+				}
+				
+				default:
+					strncpy_to_newline(buffers[i], line_buffer, strlen(line_buffer));
+			}
         }
-        else
+		else
 		{
 			while (i <= number)
 			{
 				*buffers[i] = '\0';
 				i++;
 			}
-            return 0;
+			return 0;
 		}
-    }
-    
-    fgetpos(f, &current_pos);
-	//printf("current_pos:%lli", current_pos);
-    fclose(f);
-    return current_pos;
+	}
+
+	fgetpos(f, &current_pos);
+	fclose(f);
+	return current_pos;
 }
 
 void get_genome_chunk(int location, unsigned long seq_len, char *genome, char *return_buffer)
@@ -453,8 +462,7 @@ int main(int argc, char *argv[])
 		{
 			if ( (strcmp(argv[i], "--input") == 0) || (strcmp(argv[i], "-i") == 0))
 			{
-				file_loc = malloc(sizeof(char)*strlen(argv[i+1]));
-				strncpy(file_loc, argv[i+1], strlen(argv[i+1]));
+				file_loc = argv[i+1];
 			}
 			else if ( (strcmp(argv[i], "--genome") == 0) || (strcmp(argv[i], "-g") == 0))
 			{
@@ -565,7 +573,7 @@ int main(int argc, char *argv[])
 	int j;
 	int log_iter=0;
 	int total_processed_reads=0;
-	fpos_t last_pos=1;
+	fpos_t last_pos=0;
 	char out_queue[max_queue_size][1024];
 	
 	int loop_num = 0;
