@@ -25,6 +25,7 @@ struct ParamContainer
     float last_n_mM_threshold;
 };
 
+enum {GOT_LAST_SEQS, FERROR};
 
 #ifdef PTHREADS
 
@@ -125,15 +126,14 @@ int is_valid_read(char *read)
 }
 
 
-fpos_t get_next_sequences(char *file_name, int number, char buffers[][1024], fpos_t last_pos)
+int get_next_sequences(char *file_name, int number, char buffers[][1024], fpos_t last_pos, fpos_t current_pos)
 {
 	FILE *f = fopen(file_name, "r");
-	fpos_t current_pos;
     
 	if (f == NULL)
 	{
 		fprintf(stderr, "Error opening sequence file\n");
-		return -1;
+		return FERROR;
 	}
     
 	fsetpos(f, &last_pos);
@@ -164,13 +164,13 @@ fpos_t get_next_sequences(char *file_name, int number, char buffers[][1024], fpo
 				*buffers[i] = '\0';
 				i++;
 			}
-			return 0;
+			return GOT_LAST_SEQS;
 		}
 	}
 
 	fgetpos(f, &current_pos);
 	fclose(f);
-	return current_pos;
+	return 0;
 }
 
 void get_genome_chunk(int location, unsigned long seq_len, char *genome, char *return_buffer)
@@ -588,7 +588,10 @@ int main(int argc, char *argv[])
 	int j;
 	int log_iter=0;
 	int total_processed_reads=0;
-	fpos_t last_pos=0;
+	int get_next_sequences_ret;
+	fpos_t last_pos;
+	fpos_t new_pos;
+	last_pos.__pos = 0;
 	char out_queue[max_queue_size][1024];
 	
 	int loop_num = 0;
@@ -609,8 +612,8 @@ int main(int argc, char *argv[])
 		}
 		log_iter++;
 
-		last_pos = get_next_sequences(file_loc, max_queue_size, out_queue, last_pos);
-		if (last_pos == -1)
+		get_next_sequences_ret = get_next_sequences(file_loc, max_queue_size, out_queue, last_pos, new_pos);
+		if (get_next_sequences_ret == FERROR)
 		{
 			fprintf(stderr, "Bailing due to file error\n");
 			term=1;
@@ -632,7 +635,7 @@ int main(int argc, char *argv[])
 			pthread_cond_wait(&finished_cond, &finished_mutex);
 
 		pthread_mutex_unlock(&finished_mutex);
-		if (last_pos == 0)
+		if (get_next_sequences_ret == GOT_LAST_SEQS)
 		{
 			fprintf(stderr, "Got last batch of sequences\n");
 			break;
