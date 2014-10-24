@@ -110,6 +110,21 @@ char* get_genome(char *filename)
     
 }
 
+
+int is_valid_read(char *read)
+{	
+	char c;
+	while (*read != '\0')
+	{
+		c = *read;
+		if (c !=  ('A' || 'T' || 'G' || 'C'))
+			return -1;
+		read++;
+	}	
+	return 0;
+}
+
+
 fpos_t get_next_sequences(char *file_name, int number, char buffers[][1024], fpos_t last_pos)
 {
 	FILE *f = fopen(file_name, "r");
