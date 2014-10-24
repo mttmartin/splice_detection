@@ -117,8 +117,8 @@ fpos_t get_next_sequences(char *file_name, int number, char buffers[][1024], fpo
     
 	if (f == NULL)
 	{
-		perror("Error opening sequence file");
-		return 0;
+		fprintf(stderr, "Error opening sequence file\n");
+		return -1;
 	}
     
 	fsetpos(f, &last_pos);
@@ -595,7 +595,13 @@ int main(int argc, char *argv[])
 		log_iter++;
 
 		last_pos = get_next_sequences(file_loc, max_queue_size, out_queue, last_pos);
-
+		if (last_pos == -1)
+		{
+			fprintf(stderr, "Bailing due to file error\n");
+			term=1;
+			pthread_cond_broadcast(&start_cond);
+			break;
+		}
 
 		for (j=0; j <= max_queue_size; ++j)
 		{
@@ -617,8 +623,6 @@ int main(int argc, char *argv[])
 			break;
 		}
 	}
-	
-
 
 	for (i=0; i < thread_num; i++)
 	{
