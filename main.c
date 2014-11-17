@@ -78,36 +78,28 @@ int strncpy_to_newline(char *string1, char *string2, int len)
     return 0;
 }
 
-char* get_genome(char *filename)
+int get_genome(char *filename, char **genome)
 {
 	FILE *f = fopen(filename, "rb");
-	char *buffer = malloc(sizeof(char)*1);
-	char c;
+	long file_size;
 
-    
-	int i =0;
-	while ((c = fgetc(f)) != EOF)
+	if (f == NULL)
 	{
-		buffer[i] = (char)c;
-		i++;
-        
-        char *tmp = realloc(buffer, sizeof(char)*i+1);
-		if (tmp == NULL)
-		{
-			fprintf(stderr, "Error allocating memory\n");
-            fclose(f);
-            free(buffer);
-			return NULL;
-		}
-        else
-            buffer = tmp;
+		fprintf(stderr, "Error opening genome");
+		free(*genome);
+		return -1;
 	}
-    
-    
-	buffer[i++] = '\0';
+
+	fseek(f, SEEK_SET, SEEK_END);
+	file_size = ftell (f);	
+	*genome = malloc(sizeof(char)*file_size);
+
+	fseek(f, SEEK_CUR, SEEK_SET);
+	fread(*genome, 1, file_size, f);
+
+
 	fclose(f);
-    return buffer;
-    
+	return 0;
 }
 
 fpos_t get_next_sequences(char *file_name, int number, char buffers[][1024], fpos_t last_pos)
@@ -466,7 +458,7 @@ int main(int argc, char *argv[])
 			}
 			else if ( (strcmp(argv[i], "--genome") == 0) || (strcmp(argv[i], "-g") == 0))
 			{
-				genome = get_genome(argv[i+1]);
+				get_genome(argv[i+1], &genome);
 			}
 			else if ( (strcmp(argv[i], "--status_log") == 0) || (strcmp(argv[i], "-l") == 0))
 			{
@@ -631,9 +623,8 @@ int main(int argc, char *argv[])
 	}
 #endif
 
-
 	
 	free (read_queue);
-    free(genome);
+	free(genome);
 
 }
