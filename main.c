@@ -107,14 +107,18 @@ int get_genome(char *filename, char **genome)
 int is_valid_read(char *read)
 {	
 	char c;
-	while (*read != '\0')
+	int i = 0;
+	while ( (read[i] != '\0') && (read[i] != '\n'))
 	{
-		c = *read;
-		if ((c != 'A') || (c != 'T') || (c != 'G') || (c != 'C'))
-			return -1;
-		read++;
+		c = read[i];
+		if ((c == 'A') || (c == 'T') || (c == 'G') || (c == 'C'))
+		{
+			i++;
+		}
+		else
+			return 0;
 	}	
-	return 0;
+	return 1;
 }
 
 
@@ -285,7 +289,11 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
 	fprintf(stderr, "check_for_splice-->Seq:%s\n", read);
     unsigned long read_len = strlen(read);
    
-    int i;
+
+	if (!is_valid_read(read))
+		return;
+    
+	int i;
     /*char *part1 = malloc(sizeof(char)*read_len+2);
     char *part2 = malloc(sizeof(char)*read_len+2);*/
     char *genome_chunk = malloc(sizeof(char)*read_len+2);
@@ -409,7 +417,6 @@ void *pthread_worker (void *data)
 		pthread_mutex_unlock (&queue_mutex);
 		//printf("count:%i\n", count);
 
-		//printf("Checking:%s", read);
 		check_for_splice (tmp, p_args->genome, p_args->paramcontainer);
 		free(tmp);
 	}
