@@ -110,7 +110,7 @@ int is_valid_read(char *read)
 	while (*read != '\0')
 	{
 		c = *read;
-		if (c !=  ('A' || 'T' || 'G' || 'C'))
+		if ((c != 'A') || (c != 'T') || (c != 'G') || (c != 'C'))
 			return -1;
 		read++;
 	}	
