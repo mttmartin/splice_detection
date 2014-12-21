@@ -25,7 +25,7 @@ struct ParamContainer
     float last_n_mM_threshold;
 };
 
-enum {GOT_LAST_SEQS, FERROR};
+enum {GOT_LAST_SEQS, FERROR, CONTINUE};
 
 #ifdef PTHREADS
 
@@ -122,7 +122,7 @@ int is_valid_read(char *read)
 }
 
 
-int get_next_sequences(char *file_name, int number, char buffers[][1024], fpos_t last_pos, fpos_t current_pos)
+int get_next_sequences(char *file_name, int number, char buffers[][1024], fpos_t *last_pos)
 {
 	FILE *f = fopen(file_name, "r");
     
@@ -132,7 +132,7 @@ int get_next_sequences(char *file_name, int number, char buffers[][1024], fpos_t
 		return FERROR;
 	}
     
-	fsetpos(f, &last_pos);
+	fsetpos(f, last_pos);
 
 	int i;
 	char line_buffer[1024] = {'\0'};
@@ -164,9 +164,9 @@ int get_next_sequences(char *file_name, int number, char buffers[][1024], fpos_t
 		}
 	}
 
-	fgetpos(f, &current_pos);
+	fgetpos(f, last_pos);
 	fclose(f);
-	return 0;
+	return CONTINUE;
 }
 
 void get_genome_chunk(int location, unsigned long seq_len, char *genome, char *return_buffer)
@@ -589,7 +589,6 @@ int main(int argc, char *argv[])
 	int total_processed_reads=0;
 	int get_next_sequences_ret;
 	fpos_t last_pos = 0;
-	fpos_t new_pos;
 	char out_queue[max_queue_size][1024];
 	
 	int loop_num = 0;
@@ -610,7 +609,7 @@ int main(int argc, char *argv[])
 		}
 		log_iter++;
 
-		get_next_sequences_ret = get_next_sequences(file_loc, max_queue_size, out_queue, last_pos, new_pos);
+		get_next_sequences_ret = get_next_sequences(file_loc, max_queue_size, out_queue, &last_pos);
 		if (get_next_sequences_ret == FERROR)
 		{
 			fprintf(stderr, "Bailing due to file error\n");
