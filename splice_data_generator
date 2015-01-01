@@ -1,0 +1,71 @@
+#!/usr/bin/env python2
+import random,math
+import sys, getopt
+from Bio import SeqIO
+
+
+
+# CLI arguments
+# genome
+# max_size
+# min_size
+# sequences to generate
+# gap in genome
+
+
+def display_help():
+    print "Usage: splice_data_generator -g genome_file.fa"
+    print "-g: Location of genome file"
+    print "--max_size=N: integer for max size of sequence"
+    print "--min_size=N: integer for minimum size of sequence"
+    print "-n N: integer for number of sequences to generate"
+    print "--gap N: integer for length of gap within genome between spliced sequences"
+
+genome_loc=''
+sequences_to_generate=50
+
+max_size=24
+min_size=20
+gap = 100
+
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "hg:n:", ['max_size=', 'min_size=', 'gap='])
+except getopt.GetoptError as err:
+    print 'Usage error'
+    sys.exit(2)
+for opt, arg in opts:
+    if opt == '-g':
+        genome_loc = arg
+    elif opt == '-h':
+        display_help()
+        sys.exit(2)
+    elif opt in ('--max_size'):
+        max_size = arg
+    elif opt in ('--min_size'):
+        min_size = arg
+    elif opt == '-n':
+        sequences_to_generate=arg
+    elif opt in ('--gap'):
+        gap = arg
+
+if genome_loc == '':
+    print 'Must specify genome location with -g'
+    sys.exit(2)
+genome = str(SeqIO.parse(open(genome_loc, "rU"), "fasta").next().seq)
+
+splices=[]
+for i in range(0,sequences_to_generate):
+	size=random.randint(min_size,max_size)
+	start_point=random.randint(1,2000)
+	end_point=start_point+gap
+	splice_loc = random.randint(math.ceil(size/4), math.ceil(size-(size/4)))
+	part1 = genome[start_point:(start_point+splice_loc)]
+	part2 = genome[end_point:end_point+(size-splice_loc)]
+	splice = part1+part2
+	splices.append(splice)
+
+	print '> splice ' + str(i) + '(' + str(splice_loc) + ')'
+	print splice
+
+
