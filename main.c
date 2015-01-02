@@ -286,7 +286,7 @@ int determine_splice_loc(char *seq, char *chunk, struct ParamContainer paramcont
 
 void check_for_splice(char *read, char *genome, struct ParamContainer paramcontainer)
 {
-	fprintf(stderr, "check_for_splice-->Seq:%s\n", read);
+	//fprintf(stderr, "check_for_splice-->Seq:%s\n", read);
     unsigned long read_len = strlen(read);
    
 
@@ -594,17 +594,21 @@ int main(int argc, char *argv[])
 	int loop_num = 0;
 
 
-	printf("max_queue_size:%i\n", max_queue_size);
+	fprintf(stderr,"max_queue_size:%i\n", max_queue_size);
 	while (1)
 	{
-		printf("starting loop:%i\n",loop_num);
+		//fprintf(stderr,"starting loop:%i\n",loop_num);
 		loop_num++;
 
-		if ((status_log_file_loc) && (log_iter > log_interval))
+		if (log_iter > log_interval)
 		{
-			status_log_file = fopen(status_log_file_loc, "w");
-			fprintf(status_log_file, "%i\n", (loop_num*max_queue_size));
-			fclose(status_log_file);
+			if (status_log_file_loc)
+			{
+				status_log_file = fopen(status_log_file_loc, "w");
+				fprintf(status_log_file, "%i\n", (loop_num*max_queue_size));
+				fclose(status_log_file);
+			}
+			fprintf(stderr, "Log:%i\n", (loop_num*max_queue_size));
 			log_iter = 0;
 		}
 		log_iter++;
