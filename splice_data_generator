@@ -41,13 +41,13 @@ for opt, arg in opts:
         display_help()
         sys.exit(2)
     elif opt in ('--max_size'):
-        max_size = arg
+        max_size = int(arg)
     elif opt in ('--min_size'):
-        min_size = arg
+        min_size = int(arg)
     elif opt == '-n':
-        sequences_to_generate=arg
+        sequences_to_generate=int(arg)
     elif opt in ('--gap'):
-        gap = arg
+        gap = int(arg)
 
 if genome_loc == '':
     print 'Must specify genome location with -g'
