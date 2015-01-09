@@ -296,7 +296,8 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
 	int i;
     /*char *part1 = malloc(sizeof(char)*read_len+2);
     char *part2 = malloc(sizeof(char)*read_len+2);*/
-    char *genome_chunk = malloc(sizeof(char)*read_len+2);
+    //char *genome_chunk = malloc(sizeof(char)*read_len+2);
+	char *genome_chunk = calloc(read_len+1, sizeof(char));
     for (i=0; i < strlen(genome)-read_len; i++)
     {
         //char *genome_chunk = get_genome_chunk(i, read_len, genome);
@@ -310,17 +311,27 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
 
             int part1_loc = 0;
             int part2_loc = 0;
-            /*memset(part1, 0, strlen(part1));
+            
+			
+		
+			/*memset(part1, 0, strlen(part1));
             memset(part2, 0, strlen(part2));*/
 			
-			/* new */
-			char *part1 = malloc(sizeof(char)*read_len+1);
-			char *part2 = malloc(sizeof(char)*read_len+1*2);
-			memset(part2, '\0', read_len+1);
+			/* new(old now) */
+			/*char *part1 = malloc(sizeof(char)*read_len+1);
+			char *part2 = malloc(sizeof(char)*read_len+1*2);*/
+			//memset(part2, '\0', read_len+1);
 			/*old
 			memset(part1, 0, strlen(read));
 			memset(part2, 0, strlen(read));
             */
+			
+			char *part1 = calloc(read_len, sizeof(char));
+			char *part2 = calloc(read_len, sizeof(char));
+
+
+			
+
 			// cut read into parts
             strncpy(part1, read, splice_site);
             
@@ -409,10 +420,11 @@ void *pthread_worker (void *data)
 			count++;
 			return NULL;
 		}
-		char *tmp = malloc(sizeof(char)*strlen(read)+2);
-		memset(tmp, '\0', strlen(read)+1);
-		memcpy(tmp, read, strlen(read)+1);
-		tmp[strlen(read)+2] = '\0';
+		
+		char *tmp = calloc(strlen(read)+1, sizeof(char));
+		//memset(tmp, '\0', strlen(read)+1);
+		memcpy(tmp, read, strlen(read));
+		//tmp[strlen(read)+2] = '\0';
 		count++;
 		pthread_mutex_unlock (&queue_mutex);
 		//printf("count:%i\n", count);
@@ -435,7 +447,7 @@ int main(int argc, char *argv[])
 	FILE *status_log_file = NULL;
 	int log_interval = 1000;
 	
-	int thread_num = 2;
+	int thread_num = 5;
     struct ParamContainer paramcontainer;
     
     paramcontainer.seed_len = 3;
