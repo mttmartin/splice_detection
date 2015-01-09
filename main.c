@@ -171,9 +171,7 @@ int get_next_sequences(char *file_name, int number, char buffers[][1024], fpos_t
 
 void get_genome_chunk(int location, unsigned long seq_len, char *genome, char *return_buffer)
 {
-    //char *return_buffer = malloc(sizeof(char)*seq_len+1);
     strncpy(return_buffer, genome+location, seq_len);
-    //return return_buffer;
 }
 
 
@@ -294,15 +292,9 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
 		return;
     
 	int i;
-    /*char *part1 = malloc(sizeof(char)*read_len+2);
-    char *part2 = malloc(sizeof(char)*read_len+2);*/
-    //char *genome_chunk = malloc(sizeof(char)*read_len+2);
-	char *genome_chunk = calloc(read_len+1, sizeof(char));
     for (i=0; i < strlen(genome)-read_len; i++)
     {
-        //char *genome_chunk = get_genome_chunk(i, read_len, genome);
-       // memset(genome_chunk, 0, strlen(genome_chunk));
-        memset(genome_chunk, 0, strlen(read));
+	    char *genome_chunk = calloc(read_len+1, sizeof(char));
 		get_genome_chunk(i, read_len, genome, genome_chunk);
         int splice_site = determine_splice_loc(read, genome_chunk, paramcontainer);
         
@@ -311,26 +303,10 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
 
             int part1_loc = 0;
             int part2_loc = 0;
-            
-			
 		
-			/*memset(part1, 0, strlen(part1));
-            memset(part2, 0, strlen(part2));*/
-			
-			/* new(old now) */
-			/*char *part1 = malloc(sizeof(char)*read_len+1);
-			char *part2 = malloc(sizeof(char)*read_len+1*2);*/
-			//memset(part2, '\0', read_len+1);
-			/*old
-			memset(part1, 0, strlen(read));
-			memset(part2, 0, strlen(read));
-            */
 			
 			char *part1 = calloc(read_len, sizeof(char));
 			char *part2 = calloc(read_len, sizeof(char));
-
-
-			
 
 			// cut read into parts
             strncpy(part1, read, splice_site);
@@ -344,7 +320,7 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
             
             if (strlen(part1) < paramcontainer.part1_small_size_threshold)
             {
-                //free(genome_chunk);
+                free(genome_chunk);
                 continue;
             }
 
@@ -358,7 +334,7 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
             if ((is_in_genome(part2, genome)) && (part1_loc < part2_loc))
             {
                 printf("%s,%i,%i,%i\n", read, part1_loc, part2_loc, splice_site);
-                //free(genome_chunk);
+                free(genome_chunk);
                 free(part1);
                 free(part2);
                 return;
@@ -367,12 +343,10 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
         free(part1);
 		free(part2); 
         }
-                //free (genome_chunk);
+       
+	   	free (genome_chunk);
 
     }
-    //free(genome_chunk);
-    /*free(part1);
-    free(part2);*/
     
 }
 
@@ -422,9 +396,7 @@ void *pthread_worker (void *data)
 		}
 		
 		char *tmp = calloc(strlen(read)+1, sizeof(char));
-		//memset(tmp, '\0', strlen(read)+1);
 		memcpy(tmp, read, strlen(read));
-		//tmp[strlen(read)+2] = '\0';
 		count++;
 		pthread_mutex_unlock (&queue_mutex);
 		//printf("count:%i\n", count);
