@@ -333,8 +333,14 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
             
             if ((is_in_genome(part2, genome)) && (part1_loc < part2_loc))
             {
-                printf("%s,%i,%i,%i\n", read, part1_loc, part2_loc, splice_site);
-                free(genome_chunk);
+				int read_pol = '-'; // Dummy value until polarity is added
+				int donor_loc = part1_loc + strlen(part1);
+				int acceptor_loc = part2_loc;
+				int intron_len = acceptor_loc - donor_loc;
+                
+				printf("%s,%i,%i,%i,%lu,%i,%c\n", read, donor_loc, acceptor_loc, splice_site, read_len, intron_len, read_pol);
+				
+				free(genome_chunk);
                 free(part1);
                 free(part2);
                 return;
@@ -545,7 +551,7 @@ int main(int argc, char *argv[])
 
 
 #ifdef PTHREADS
-	printf("read, loc1, loc2, splice_loc\n");
+	printf("read, donor_loc, acceptor_loc, splice_loc, read_len, intron_len, read_pol\n");
 
 	struct timespec ts1, ts2;
 	ts1.tv_sec = 0;
