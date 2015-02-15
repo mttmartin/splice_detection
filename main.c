@@ -79,10 +79,25 @@ int strncpy_to_newline(char *string1, char *string2, int len)
     return 0;
 }
 
+int is_valid_base(char c)
+{
+	if ((c == 'A') || (c == 'T') || (c == 'G') || (c == 'C'))
+		return 1;
+
+	return 0;
+}
+
+/* get_genome(char *filename, char **genome)
+ * Reads file given by filename and stores the nucleotide sequence in **genome.
+ * Returns 0 if successful, otherwise returns < 0.
+ */
+
 int get_genome(char *filename, char **genome)
 {
+
 	FILE *f = fopen(filename, "rb");
 	long file_size;
+	char *genome_buffer;
 
 	if (f == NULL)
 	{
@@ -91,13 +106,45 @@ int get_genome(char *filename, char **genome)
 		return -1;
 	}
 
+	// Seek through file to find maximum genome size for allocation of genome buffer
 	fseek(f, SEEK_SET, SEEK_END);
 	file_size = ftell (f);	
-	*genome = malloc(sizeof(char)*file_size);
-
 	fseek(f, SEEK_CUR, SEEK_SET);
-	fread(*genome, 1, file_size, f);
 
+	*genome = calloc(file_size, sizeof(char));
+
+	char c;
+	int i = 0;
+
+	while ( ( c = fgetc(f)) != EOF)
+	{
+			if (c == '>')
+			{
+				fprintf(stderr, "Skip line\n");
+				
+				// Keep reading until a newline is found or EOF occurs
+				while ( (c=fgetc(f)) != EOF)
+				{
+					if (c == '\n')
+						break;
+				
+					fprintf(stderr, "Skip character\n");
+				}
+
+				continue;
+			}
+
+			
+			if (!is_valid_base(c))
+			{
+
+				fprintf(stderr, "non standard base\n");
+				continue;
+			}
+
+			(*genome)[i] = c;
+			i++;
+	}
 
 	fclose(f);
 	return 0;
@@ -333,8 +380,14 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
             
             if ((is_in_genome(part2, genome)) && (part1_loc < part2_loc))
             {
-                printf("%s,%i,%i,%i\n", read, part1_loc, part2_loc, splice_site);
-                free(genome_chunk);
+				int read_pol = '-'; // Dummy value until polarity is added
+				int donor_loc = part1_loc + strlen(part1);
+				int acceptor_loc = part2_loc;
+				int intron_len = acceptor_loc - donor_loc;
+                
+				printf("%s,%i,%i,%i,%lu,%i,%c\n", read, donor_loc, acceptor_loc, splice_site, read_len, intron_len, read_pol);
+				
+				free(genome_chunk);
                 free(part1);
                 free(part2);
                 return;
@@ -465,6 +518,7 @@ int main(int argc, char *argv[])
 			else if ( (strcmp(argv[i], "--genome") == 0) || (strcmp(argv[i], "-g") == 0))
 			{
 				get_genome(argv[i+1], &genome);
+				fprintf(stderr, "Genome:%s", genome);
 			}
 			else if ( (strcmp(argv[i], "--status_log") == 0) || (strcmp(argv[i], "-l") == 0))
 			{
@@ -545,7 +599,7 @@ int main(int argc, char *argv[])
 
 
 #ifdef PTHREADS
-	printf("read, loc1, loc2, splice_loc\n");
+	printf("read, donor_loc, acceptor_loc, splice_loc, read_len, intron_len, read_pol\n");
 
 	struct timespec ts1, ts2;
 	ts1.tv_sec = 0;
@@ -576,6 +630,7 @@ int main(int argc, char *argv[])
 	char out_queue[max_queue_size][1024];
 	
 	int loop_num = 0;
+	int on_reverse = 0;
 
 
 	fprintf(stderr,"max_queue_size:%i\n", max_queue_size);
@@ -623,7 +678,15 @@ int main(int argc, char *argv[])
 		if (get_next_sequences_ret == GOT_LAST_SEQS)
 		{
 			fprintf(stderr, "Got last batch of sequences\n");
-			break;
+			if (on_reverse == 0)
+			{
+				on_reverse = 1;
+				//flip genome
+			}
+			else
+			{
+				break;
+			}
 		}
 	}
 
