@@ -53,7 +53,22 @@ char **read_queue;
 #endif
 
 
+int reverse_string(char *string)
+{
+	if (string == NULL)
+		return -1;
 
+	char *end = string + strlen(string) - 1;
+	char c;
+	while (string < end)
+	{
+		c = *string;
+		*string++ = *end;
+		*end-- = c;
+	}
+
+	return 0;
+}
 
 int array_sum(int array[], int length)
 {
@@ -332,13 +347,22 @@ int determine_splice_loc(char *seq, char *chunk, struct ParamContainer paramcont
 void check_for_splice(char *read, char *genome, struct ParamContainer paramcontainer)
 {
 	//fprintf(stderr, "check_for_splice-->Seq:%s\n", read);
-    unsigned long read_len = strlen(read);
+    int read_len = strlen(read);
    
 
 	if (!is_valid_read(read))
 		return;
     
 	int i;
+	int is_rev=0;
+
+	for (is_rev = 0; is_rev <= 1; is_rev++)
+	{
+		if (is_rev == 1)
+		{
+			reverse_string(read);
+		}
+		
     for (i=0; i < strlen(genome)-read_len; i++)
     {
 	    char *genome_chunk = calloc(read_len+1, sizeof(char));
@@ -384,13 +408,27 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
 				int donor_loc = part1_loc + strlen(part1);
 				int acceptor_loc = part2_loc;
 				int intron_len = acceptor_loc - donor_loc;
-                
-				printf("%s,%i,%i,%i,%lu,%i,%c\n", read, donor_loc, acceptor_loc, splice_site, read_len, intron_len, read_pol);
+               	
+			   	if (is_rev==1)
+				{
+					int tmp_loc;
+
+					tmp_loc = donor_loc;
+					donor_loc = acceptor_loc;
+					acceptor_loc = tmp_loc;
+					
+					// Return string to orignal orientation
+					reverse_string(read);
+					splice_site = read_len - splice_site;
+					
+				}
 				
+				printf("%s,%i,%i,%i,%i,%i,%c\n", read, donor_loc, acceptor_loc, splice_site, read_len, intron_len, read_pol);
+
 				free(genome_chunk);
                 free(part1);
                 free(part2);
-                return;
+                break;
             }
 
         free(part1);
@@ -400,6 +438,7 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
 	   	free (genome_chunk);
 
     }
+}
     
 }
 
@@ -630,7 +669,6 @@ int main(int argc, char *argv[])
 	char out_queue[max_queue_size][1024];
 	
 	int loop_num = 0;
-	int on_reverse = 0;
 
 
 	fprintf(stderr,"max_queue_size:%i\n", max_queue_size);
@@ -678,15 +716,7 @@ int main(int argc, char *argv[])
 		if (get_next_sequences_ret == GOT_LAST_SEQS)
 		{
 			fprintf(stderr, "Got last batch of sequences\n");
-			if (on_reverse == 0)
-			{
-				on_reverse = 1;
-				//flip genome
-			}
-			else
-			{
-				break;
-			}
+			break;
 		}
 	}
 
