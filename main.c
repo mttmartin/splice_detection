@@ -23,6 +23,10 @@ struct ParamContainer
     
     int last_n_length;
     float last_n_mM_threshold;
+
+
+	int do_anti_sense;
+	int do_rev;
 };
 
 enum {GOT_LAST_SEQS, FERROR, CONTINUE};
@@ -69,6 +73,34 @@ int reverse_string(char *string)
 
 	return 0;
 }
+
+int reverse_compliment(char *string)
+{
+	reverse_string(string);
+
+	char c;
+	while ( (c = *string) != '\0')
+	{
+		if (c == 'A')
+			*string = 'T';
+		else if (c == 'T')
+			*string = 'A';
+		else if (c == 'G')
+			*string = 'C';
+		else if (c == 'C')
+			*string = 'G';
+		else
+		{
+			fprintf(stderr, "reverse_compliment: invalid read sequence\n");
+			return -1;
+		}
+		string++;
+	}
+
+	return 0;
+}
+
+
 
 int array_sum(int array[], int length)
 {
@@ -135,15 +167,12 @@ int get_genome(char *filename, char **genome)
 	{
 			if (c == '>')
 			{
-				fprintf(stderr, "Skip line\n");
-				
 				// Keep reading until a newline is found or EOF occurs
 				while ( (c=fgetc(f)) != EOF)
 				{
 					if (c == '\n')
 						break;
 				
-					fprintf(stderr, "Skip character\n");
 				}
 
 				continue;
@@ -152,8 +181,6 @@ int get_genome(char *filename, char **genome)
 			
 			if (!is_valid_base(c))
 			{
-
-				fprintf(stderr, "non standard base\n");
 				continue;
 			}
 
@@ -348,99 +375,144 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
 {
 	//fprintf(stderr, "check_for_splice-->Seq:%s\n", read);
     int read_len = strlen(read);
-   
+	enum {ON_DEFAULT, ON_REVERSE, ON_ANTI};
+ 
 
 	if (!is_valid_read(read))
 		return;
     
 	int i;
 	int is_rev=0;
+	int finished=0;
+	int status = ON_DEFAULT;
+	char *original_read = calloc(strlen(read), sizeof(char));
+	strncpy(original_read, read, strlen(read));
 
-	for (is_rev = 0; is_rev <= 1; is_rev++)
+	while (!finished)
 	{
-		if (is_rev == 1)
-		{
-			reverse_string(read);
-		}
-		
-    for (i=0; i < strlen(genome)-read_len; i++)
-    {
-	    char *genome_chunk = calloc(read_len+1, sizeof(char));
-		get_genome_chunk(i, read_len, genome, genome_chunk);
-        int splice_site = determine_splice_loc(read, genome_chunk, paramcontainer);
-        
-        if (splice_site > 0)
-        {
 
-            int part1_loc = 0;
-            int part2_loc = 0;
+		
+    	for (i=0; i < strlen(genome)-read_len; i++)
+    	{
+	    	char *genome_chunk = calloc(read_len+1, sizeof(char));
+			get_genome_chunk(i, read_len, genome, genome_chunk);
+        	int splice_site = determine_splice_loc(read, genome_chunk, paramcontainer);
+        
+        	if (splice_site > 0)
+        	{
+
+            	int part1_loc = 0;
+            	int part2_loc = 0;
 		
 			
-			char *part1 = calloc(read_len, sizeof(char));
-			char *part2 = calloc(read_len, sizeof(char));
+				char *part1 = calloc(read_len, sizeof(char));
+				char *part2 = calloc(read_len, sizeof(char));
 
-			// cut read into parts
-            strncpy(part1, read, splice_site);
+				// cut read into parts
+            	strncpy(part1, read, splice_site);
             
-            int j;
-            for (j=0; !(is_in_genome(part1, genome)) && ((int)splice_site-j >= 0); j++)
-            {
+            	int j;
+            	for (j=0; !(is_in_genome(part1, genome)) && ((int)splice_site-j >= 0); j++)
+            	{
                     memset(part1, 0, read_len+1);
 					strncpy(part1, read, splice_site-j);
-            }
+        	    }
             
-            if (strlen(part1) < paramcontainer.part1_small_size_threshold)
-            {
-                free(genome_chunk);
-                continue;
-            }
+            	if (strlen(part1) < paramcontainer.part1_small_size_threshold)
+            	{
+                	free(genome_chunk);
+                	continue;
+            	}
 
-            splice_site = (int) strlen(part1);
+            	splice_site = (int) strlen(part1);
 			
-			strncpy(part2, read+splice_site, strlen(read)-splice_site);
+				strncpy(part2, read+splice_site, strlen(read)-splice_site);
 			
-			part1_loc = location_in_genome(part1, genome);
-            part2_loc = location_in_genome(part2, genome);
+				part1_loc = location_in_genome(part1, genome);
+            	part2_loc = location_in_genome(part2, genome);
             
-            if ((is_in_genome(part2, genome)) && (part1_loc < part2_loc))
-            {
-				int read_pol = '-'; // Dummy value until polarity is added
-				int donor_loc = part1_loc + strlen(part1);
-				int acceptor_loc = part2_loc;
-				int intron_len = acceptor_loc - donor_loc;
+            	if ((is_in_genome(part2, genome)) && (part1_loc < part2_loc))
+            	{
+					int read_pol = '+'; // Dummy value until polarity is added
+					int donor_loc = part1_loc + strlen(part1);
+					int acceptor_loc = part2_loc;
+					int intron_len = acceptor_loc - donor_loc;
                	
-			   	if (is_rev==1)
-				{
-					int tmp_loc;
+			   		if (status == ON_REVERSE)
+					{
+						int tmp_loc;
 
-					tmp_loc = donor_loc;
-					donor_loc = acceptor_loc;
-					acceptor_loc = tmp_loc;
+						// Give donor and acceptor locations in relationship to original read
+						tmp_loc = donor_loc;
+						donor_loc = acceptor_loc;
+						acceptor_loc = tmp_loc;
 					
-					// Return string to orignal orientation
-					reverse_string(read);
-					splice_site = read_len - splice_site;
+						// Return string to orignal orientation
+						reverse_string(read);
+						splice_site = read_len - splice_site;
 					
-				}
+					}
+
+					else if (status == ON_ANTI)
+					{
+						int tmp_loc;
+						
+						// Give donor and acceptor locations in relationship to original read
+						tmp_loc = donor_loc;
+						donor_loc = acceptor_loc;
+						acceptor_loc = tmp_loc;
+
+						// Report this read as antisense
+						read_pol = '-';
+
+						// Return the string to its original orientation
+						reverse_compliment(read);
+						splice_site = read_len - splice_site;
+					}
 				
-				printf("%s,%i,%i,%i,%i,%i,%c\n", read, donor_loc, acceptor_loc, splice_site, read_len, intron_len, read_pol);
+					printf("%s,%i,%i,%i,%i,%i,%c\n", read, donor_loc, acceptor_loc, splice_site, read_len, intron_len, read_pol);
 
-				free(genome_chunk);
-                free(part1);
-                free(part2);
-                break;
-            }
+					free(genome_chunk);
+                	free(part1);
+                	free(part2);
+                	break;
+            	}
 
-        free(part1);
-		free(part2); 
-        }
+        	free(part1);
+			free(part2); 
+        	}
        
-	   	free (genome_chunk);
+	   	
+	free (genome_chunk);
+	}
+		
+		if ((paramcontainer.do_rev) && (status == ON_DEFAULT))
+		{
+			status = ON_REVERSE;
+			reverse_string(read);
+		}
+
+		else if ( (paramcontainer.do_anti_sense)  && (status == ON_REVERSE))
+		{
+			status=ON_ANTI;
+			strncpy(read, original_read, strlen(original_read));
+		    reverse_compliment(read);
+		}
+		else if (status == ON_ANTI)
+		{
+			break;
+		}
+		else if (status == ON_DEFAULT)
+		{
+			break;
+		}
 
     }
 }
+
+
     
-}
+
 
 #ifdef PTHREADS
 void *pthread_worker (void *data)
@@ -524,6 +596,9 @@ int main(int argc, char *argv[])
     paramcontainer.last_n_length = 4;
     paramcontainer.last_n_mM_threshold = 0.20;
 
+
+	paramcontainer.do_anti_sense = 1;
+	paramcontainer.do_rev = 1;
 
 	if (argc < 2)
 	{
