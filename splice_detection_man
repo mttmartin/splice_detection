@@ -63,7 +63,13 @@ number of bases to examine to calculate the mismatch rate in the last N bases.
 .BI "\-\-mM_last_n " float
 highest mismatch rate for part A in the last N (specified by \-\-last_n_len) bases which will not result in rejection.
 
+.TP
+.BI "\-\-skip-anti-sense "
+do not check if read could be anti-sense.
 
+.TP
+.BI "\-\-skip-reverse "
+do not check if read could be reverse.
 
 
 .SH AUTHORS
