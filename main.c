@@ -26,7 +26,7 @@ struct ParamContainer
 
 
 	int do_anti_sense;
-	int do_rev;
+	int do_reverse;
 };
 
 enum {GOT_LAST_SEQS, FERROR, CONTINUE};
@@ -486,7 +486,7 @@ void check_for_splice(char *read, char *genome, struct ParamContainer paramconta
 	free (genome_chunk);
 	}
 		
-		if ((paramcontainer.do_rev) && (status == ON_DEFAULT))
+		if ((paramcontainer.do_reverse) && (status == ON_DEFAULT))
 		{
 			status = ON_REVERSE;
 			reverse_string(read);
@@ -598,7 +598,7 @@ int main(int argc, char *argv[])
 
 
 	paramcontainer.do_anti_sense = 1;
-	paramcontainer.do_rev = 1;
+	paramcontainer.do_reverse = 1;
 
 	if (argc < 2)
 	{
@@ -632,7 +632,6 @@ int main(int argc, char *argv[])
 			else if ( (strcmp(argv[i], "--genome") == 0) || (strcmp(argv[i], "-g") == 0))
 			{
 				get_genome(argv[i+1], &genome);
-				fprintf(stderr, "Genome:%s", genome);
 			}
 			else if ( (strcmp(argv[i], "--status_log") == 0) || (strcmp(argv[i], "-l") == 0))
 			{
@@ -684,6 +683,14 @@ int main(int argc, char *argv[])
 			else if (strcmp(argv[i], "--partB_min_len") == 0)
 			{
 				paramcontainer.part2_small_size_threshold = 3;
+			}
+			else if (strcmp(argv[i], "--skip-anti-sense") == 0)
+			{
+				paramcontainer.do_anti_sense = 0;
+			}
+			else if (strcmp(argv[i], "--skip-reverse") == 0)
+			{
+				paramcontainer.do_reverse = 0;
 			}
 			else if ((strcmp(argv[i], "-h") == 0) || (strcmp(argv[i], "--help") == 0))
 			{
@@ -746,7 +753,7 @@ int main(int argc, char *argv[])
 	int loop_num = 0;
 
 
-	fprintf(stderr,"max_queue_size:%i\n", max_queue_size);
+	//fprintf(stderr,"max_queue_size:%i\n", max_queue_size);
 	while (1)
 	{
 		//fprintf(stderr,"starting loop:%i\n",loop_num);
