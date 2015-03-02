@@ -740,7 +740,7 @@ int main(int argc, char *argv[])
 	int log_iter=0;
 	int total_processed_reads=0;
 	int get_next_sequences_ret;
-	fpos_t last_pos = 0;
+	fpos_t last_pos;
 	char out_queue[max_queue_size][1024];
 	
 	int loop_num = 0;
