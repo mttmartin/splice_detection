@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <thread>
 #include <mutex>
-
+#include <string.h>
 #define current_version 0.1
 
 
