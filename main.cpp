@@ -672,7 +672,6 @@ int main(int argc, char *argv[])
 
 	vector<string> read_queue(queue_size);
 
-	get_ORFS("test.gff", &paramcontainer);
 	
 	output_CSV_header();
 	do
