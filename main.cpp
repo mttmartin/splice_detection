@@ -30,7 +30,9 @@ struct ParamContainer
     int last_n_length;
     float last_n_mM_threshold;
 
-
+	int intron_min;
+	int intron_max;
+	
 	int do_anti_sense;
 	int do_reverse;
 };
@@ -303,6 +305,13 @@ int determine_splice_loc (string seq, string chunk, struct ParamContainer paramc
 bool splice_is_valid (int splice_site, string part1, string part2, int part1_loc, int part2_loc, string genome, struct ParamContainer paramcontainer)
 {
 	
+	int intron_len = part2_loc - (part1_loc + part1.length());
+	
+	if (paramcontainer.intron_min > 0 && intron_len < paramcontainer.intron_min)
+		return false;
+	else if (paramcontainer.intron_max > 0 && intron_len > paramcontainer.intron_max)
+		return false;
+	
 	if (part1.length() > paramcontainer.part1_small_size_threshold)
 		if (is_in_genome(part2, genome) && is_in_genome(part1, genome))
 				if (part1_loc < part2_loc)
@@ -430,9 +439,12 @@ int main(int argc, char *argv[])
     paramcontainer.last_n_length = 4;
     paramcontainer.last_n_mM_threshold = 0.20;
 
+	paramcontainer.intron_min = 0;
+	paramcontainer.intron_max = 0;
 
 	paramcontainer.do_anti_sense = 1;
 	paramcontainer.do_reverse = 1;
+	
 
 	int queue_size = 5;
 
@@ -458,6 +470,8 @@ int main(int argc, char *argv[])
 		// mM1_s_threshold: --mMs
 		// last_n_length: --last_n_len
 		// last_n_mM_threshold: --mM_last_n
+		// intron_minimum: --intron_min
+		// intron_maximum: --intron_max
 
 		if ( (strncmp(argv[i], "-", 1) == 0) || (strncmp(argv[i], "--", 2) == 0))
 		{
@@ -534,6 +548,14 @@ int main(int argc, char *argv[])
 			else if (strcmp(argv[i], "--skip-reverse") == 0)
 			{
 				paramcontainer.do_reverse = 0;
+			}
+			else if (strcmp(argv[i], "--intron_min") == 0)
+			{
+				paramcontainer.intron_min = atoi(argv[i+1]);
+			}
+			else if (strcmp(argv[i], "--intron_max") == 0)
+			{
+				paramcontainer.intron_max = atoi(argv[i+1]);
 			}
 			else if ((strcmp(argv[i], "-h") == 0) || (strcmp(argv[i], "--help") == 0))
 			{
