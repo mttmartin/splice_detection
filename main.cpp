@@ -6,7 +6,7 @@
 #include <thread>
 #include <mutex>
 #include <string.h>
-#define current_version 0.1
+#define current_version "0.1.1"
 
 
 using namespace std;
@@ -45,8 +45,16 @@ bool is_valid_read (string read)
 	{
 		if (find(allowed.begin(), allowed.end(), read[i]) != allowed.end())
 			continue;
-		else
+		// For now just ignore Ns; do not display error message
+		else if (read[i] == 'N')
+		{
 			return false;
+		}
+		else
+		{
+			cerr << "Warning: Invalid read detected: " << read << endl;
+			return false;
+		}
 	}
 
 	return true;
@@ -303,6 +311,11 @@ bool splice_is_valid (int splice_site, string part1, string part2, int part1_loc
 	return false;
 }
 
+void output_CSV_header ()
+{
+	cout << "read, donor_loc, acceptor_loc, splice_loc, read_len, intron_len, read_pol\n";
+}
+
 void output_detected_splice (string read, string part1, int part1_loc, int part2_loc, int splice_loc, int status)
 {
 	char read_pol = '+';
@@ -341,6 +354,7 @@ void output_detected_splice (string read, string part1, int part1_loc, int part2
 	cout << read << "," << donor_loc << "," << acceptor_loc << "," << splice_loc << "," << read_len << "," << intron_len << "," << read_pol << endl;
 	cout_mutex.unlock();
 }
+
 void check_for_splice(string read, string genome, struct ParamContainer paramcontainer)
 {
 
@@ -542,10 +556,9 @@ int main(int argc, char *argv[])
 
 
 	vector<string> read_queue(queue_size);
-	
-	get_next_sequences(&read_file, &read_queue);
 
 
+	output_CSV_header();
 	do
 	{
 		done = get_next_sequences(&read_file, &read_queue);
