@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <thread>
 #include <mutex>
+#include <sstream>
 #include <string.h>
 #define current_version "0.1.1"
 
@@ -15,6 +16,18 @@ using namespace std;
 mutex cout_mutex;
 
 enum {ON_DEFAULT, ON_REVERSE, ON_ANTI};
+
+struct ORF_Cordinate
+{
+	int begin;
+	int end;
+
+	ORF_Cordinate(int b, int e)
+	{
+		begin = b;
+		end = e;
+	}
+};
 
 struct ParamContainer
 {
@@ -35,8 +48,9 @@ struct ParamContainer
 	
 	int do_anti_sense;
 	int do_reverse;
-};
 
+	vector<ORF_Cordinate> cords; 
+};
 
 
 bool is_valid_read (string read)
@@ -77,7 +91,7 @@ int get_genome(string filename, string *genome)
 	
 	if (!f)
 	{
-		cout << "Error opening genome file\n";
+		cerr << "Error opening genome file\n";
 		exit(1);
 	}
 
@@ -95,6 +109,85 @@ int get_genome(string filename, string *genome)
 }
 
 
+/* get_ORFs(string filename, Paramcontainer paramcontainer)
+ * Retrieves ORF locations from GFF file at filename and stores
+ * coordinates for all ORFs in paramcontainer for later use */
+bool get_ORFS(string filename, ParamContainer *paramcontainer)
+{
+	string line_buffer;
+	string field_buffer;
+	stringstream stream;
+	ifstream f;
+	f.open(filename);
+	
+	if (!f)
+	{
+		cerr << "Error opening GFF file\n";
+		exit(1);
+	}
+
+	while ( (getline(f, line_buffer)))
+	{
+		
+		
+		stream << line_buffer;
+		for (int pos=0; pos < line_buffer.length(); pos++)
+		{
+			if (isspace(line_buffer[pos]))
+			{
+				if (line_buffer[pos] != '\t' && line_buffer[pos] != '\n')
+				{
+					cerr << "Warning: GFF file has invalid format. A whitespace character other than a tab or newline was detected.\n";
+					cerr << "Line producing warning: " << line_buffer << endl;
+					break;
+				}
+			}
+		}
+
+		
+		// GFF file should have 9 columns separated by tabs
+		int i=0;
+		int begin = -1;
+		int end = -1;
+		while (getline(stream, field_buffer, '\t'))
+		{
+
+			// Fourth column is start of ORF
+			if (i == 3)
+			{
+				begin = stoi(field_buffer);
+			}
+			// Fifth column is end of ORF
+			else if (i == 4)
+			{
+				end = stoi(field_buffer);
+			}
+
+			if (i > 8)
+				break;
+			
+			i++;
+		}
+		stream.clear();
+
+		// i=0 happens at end of line... do not report error for this
+		if (i != 8 && i != 0)
+		{
+			cerr << "Warning: GFF file has invalid number of columns(" << i+1 << ")\n";
+			cerr << "Line producing error: " << line_buffer << endl;
+		}
+
+		if (begin != -1 && end != -1)
+		{
+			
+			paramcontainer->cords.push_back(ORF_Cordinate(begin,end));
+		}
+	}
+
+	f.close();
+	
+	return true;
+}
 
 bool get_next_sequences (ifstream *file, vector<string> *queue)
 {
@@ -579,7 +672,8 @@ int main(int argc, char *argv[])
 
 	vector<string> read_queue(queue_size);
 
-
+	get_ORFS("test.gff", &paramcontainer);
+	
 	output_CSV_header();
 	do
 	{
