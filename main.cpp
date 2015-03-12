@@ -49,6 +49,8 @@ struct ParamContainer
 	int do_anti_sense;
 	int do_reverse;
 
+	bool ignore_noncoding;
+
 	vector<ORF_Cordinate> cords; 
 };
 
@@ -405,6 +407,34 @@ bool splice_is_valid (int splice_site, string part1, string part2, int part1_loc
 	else if (paramcontainer.intron_max > 0 && intron_len > paramcontainer.intron_max)
 		return false;
 	
+
+	if (paramcontainer.ignore_noncoding)
+	{
+		bool found1 = false;
+		bool found2 = false;
+		
+		for (int i=0; i < paramcontainer.cords.size(); i++)
+		{
+			int begin, end;
+			begin = paramcontainer.cords[i].begin;
+			end = paramcontainer.cords[i].end;
+
+			if (part1_loc > begin && part1_loc < end)
+			{
+				found1 = true;
+			}
+			
+		   	if (part2_loc > begin && part2_loc < end)
+			{
+				found2 = true;
+			}
+		}
+		
+		if (!found1 || !found2)
+			return false;
+	}
+
+
 	if (part1.length() > paramcontainer.part1_small_size_threshold)
 		if (is_in_genome(part2, genome) && is_in_genome(part1, genome))
 				if (part1_loc < part2_loc)
@@ -516,6 +546,7 @@ int main(int argc, char *argv[])
 {
 	string filename = "genome.fa";
 	string genome;
+	string gff_file_loc;
 	ifstream read_file;
 	bool done = false;
 	
@@ -537,6 +568,8 @@ int main(int argc, char *argv[])
 
 	paramcontainer.do_anti_sense = 1;
 	paramcontainer.do_reverse = 1;
+
+	paramcontainer.ignore_noncoding = false;
 	
 
 	int queue_size = 5;
@@ -565,6 +598,7 @@ int main(int argc, char *argv[])
 		// last_n_mM_threshold: --mM_last_n
 		// intron_minimum: --intron_min
 		// intron_maximum: --intron_max
+		// ignore_noncoding: --ignore-noncoding
 
 		if ( (strncmp(argv[i], "-", 1) == 0) || (strncmp(argv[i], "--", 2) == 0))
 		{
@@ -650,6 +684,14 @@ int main(int argc, char *argv[])
 			{
 				paramcontainer.intron_max = atoi(argv[i+1]);
 			}
+			else if (strcmp(argv[i], "--ignore-noncoding") == 0)
+			{
+				paramcontainer.ignore_noncoding = true;
+			}
+			else if (strcmp(argv[i], "-gff") == 0)
+			{
+				gff_file_loc = argv[i+1];
+			}
 			else if ((strcmp(argv[i], "-h") == 0) || (strcmp(argv[i], "--help") == 0))
 			{
 				cerr << "Usage: splice_detection -i read_file -g genome_file [options]\n";
@@ -669,6 +711,12 @@ int main(int argc, char *argv[])
 
 	}
 
+
+	if (gff_file_loc != "")
+	{
+		get_ORFS(gff_file_loc, &paramcontainer);
+	}
+	
 
 	vector<string> read_queue(queue_size);
 
