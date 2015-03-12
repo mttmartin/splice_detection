@@ -185,7 +185,7 @@ bool get_ORFS(string filename, ParamContainer *paramcontainer)
 		stream.clear();
 
 		// i=0 happens at end of line... do not report error for this
-		if (i != 8 && i != 0)
+		if (i > 9 && i != 0)
 		{
 			cerr << "Warning: GFF file has invalid number of columns(" << i+1 << ")\n";
 			cerr << "Line producing error: " << line_buffer << endl;
@@ -457,12 +457,13 @@ bool splice_is_valid (int splice_site, string part1, string part2, int part1_loc
 
 void output_CSV_header ()
 {
-	cout << "read, donor_loc, acceptor_loc, splice_loc, read_len, intron_len, read_pol, part1_ORF, part2_ORF\n";
+	cout << "read, donor_loc, acceptor_loc, splice_loc, read_len, intron_len, read_pol, part1_ORF, part2_ORF, same_ORF\n";
 }
 
 void output_detected_splice (string read, string part1, int part1_loc, int part2_loc, int splice_loc, int status, ParamContainer paramcontainer)
 {
 	char read_pol = '+';
+	char same_ORF = '-';
 	int donor_loc = part1_loc + part1.length();
 	int acceptor_loc = part2_loc;
 	int intron_len = acceptor_loc - donor_loc;
@@ -481,6 +482,9 @@ void output_detected_splice (string read, string part1, int part1_loc, int part2
 		if (part2_loc > begin && part2_loc < end)
 			part2_ORF = paramcontainer.cords[i].id;
 	}
+
+	if ((part1_ORF != "." && part2_ORF != ".") && (part1_ORF == part2_ORF))
+		same_ORF = '+';
 
 	if (status == ON_REVERSE)
 	{
@@ -511,7 +515,7 @@ void output_detected_splice (string read, string part1, int part1_loc, int part2
 
 
 	cout_mutex.lock();
-	cout << read << "," << donor_loc << "," << acceptor_loc << "," << splice_loc << "," << read_len << "," << intron_len << "," << read_pol << "," << part1_ORF << "," << part2_ORF << endl;
+	cout << read << "," << donor_loc << "," << acceptor_loc << "," << splice_loc << "," << read_len << "," << intron_len << "," << read_pol << "," << part1_ORF << "," << part2_ORF << "," << same_ORF << endl;
 	cout_mutex.unlock();
 }
 
