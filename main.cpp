@@ -21,11 +21,19 @@ struct ORF_Cordinate
 {
 	int begin;
 	int end;
-
+	string id;
+	
 	ORF_Cordinate(int b, int e)
 	{
 		begin = b;
 		end = e;
+	}
+
+	ORF_Cordinate(int b, int e, string s)
+	{
+		begin = b;
+		end = e;
+		id = s;
 	}
 };
 
@@ -151,6 +159,7 @@ bool get_ORFS(string filename, ParamContainer *paramcontainer)
 		int i=0;
 		int begin = -1;
 		int end = -1;
+		string id;
 		while (getline(stream, field_buffer, '\t'))
 		{
 
@@ -165,6 +174,9 @@ bool get_ORFS(string filename, ParamContainer *paramcontainer)
 				end = stoi(field_buffer);
 			}
 
+			if (i == 8)
+				id = field_buffer;
+			
 			if (i > 8)
 				break;
 			
@@ -182,7 +194,7 @@ bool get_ORFS(string filename, ParamContainer *paramcontainer)
 		if (begin != -1 && end != -1)
 		{
 			
-			paramcontainer->cords.push_back(ORF_Cordinate(begin,end));
+			paramcontainer->cords.push_back(ORF_Cordinate(begin,end, id));
 		}
 	}
 
@@ -445,16 +457,30 @@ bool splice_is_valid (int splice_site, string part1, string part2, int part1_loc
 
 void output_CSV_header ()
 {
-	cout << "read, donor_loc, acceptor_loc, splice_loc, read_len, intron_len, read_pol\n";
+	cout << "read, donor_loc, acceptor_loc, splice_loc, read_len, intron_len, read_pol, part1_ORF, part2_ORF\n";
 }
 
-void output_detected_splice (string read, string part1, int part1_loc, int part2_loc, int splice_loc, int status)
+void output_detected_splice (string read, string part1, int part1_loc, int part2_loc, int splice_loc, int status, ParamContainer paramcontainer)
 {
 	char read_pol = '+';
 	int donor_loc = part1_loc + part1.length();
 	int acceptor_loc = part2_loc;
 	int intron_len = acceptor_loc - donor_loc;
 	int read_len = read.length();
+	string part1_ORF = ".";
+	string part2_ORF = ".";
+
+	for (int i=0; i < paramcontainer.cords.size(); i++)
+	{
+		int begin, end;
+		begin = paramcontainer.cords[i].begin;
+		end = paramcontainer.cords[i].end;
+
+		if (part1_loc > begin && part1_loc < end)
+			part1_ORF = paramcontainer.cords[i].id;
+		if (part2_loc > begin && part2_loc < end)
+			part2_ORF = paramcontainer.cords[i].id;
+	}
 
 	if (status == ON_REVERSE)
 	{
@@ -482,8 +508,10 @@ void output_detected_splice (string read, string part1, int part1_loc, int part2
 		splice_loc = read_len - splice_loc;
 	}
 
+
+
 	cout_mutex.lock();
-	cout << read << "," << donor_loc << "," << acceptor_loc << "," << splice_loc << "," << read_len << "," << intron_len << "," << read_pol << endl;
+	cout << read << "," << donor_loc << "," << acceptor_loc << "," << splice_loc << "," << read_len << "," << intron_len << "," << read_pol << "," << part1_ORF << "," << part2_ORF << endl;
 	cout_mutex.unlock();
 }
 
@@ -520,7 +548,7 @@ void check_for_splice(string read, string genome, struct ParamContainer paramcon
 
 			if (splice_is_valid (splice_loc, part1, part2, part1_loc, part2_loc, genome, paramcontainer))
 			{
-				output_detected_splice(original_read, part1, part1_loc, part2_loc, splice_loc, status);
+				output_detected_splice(original_read, part1, part1_loc, part2_loc, splice_loc, status, paramcontainer);
 			}
 
 
