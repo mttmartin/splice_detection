@@ -110,6 +110,10 @@ negative_time = round(negative_time, 4)
 negative_time_per_read = round(negative_time_per_read, 4)
 negative_detected_percentage = round(negative_detected_percentage, 3)
 
+
+os.system('rm performance_negative_data.csv')
+os.system('rm performance_positive_data.csv')
+
 print '--------------------------------------------------'
 print 'Ending run with negative dataset'
 print '--------------------------------------------------'
