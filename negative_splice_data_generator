@@ -1,0 +1,69 @@
+#!/usr/bin/env python2
+import random,math
+import sys, getopt
+from Bio import SeqIO
+
+
+def display_help():
+    print "Usage: splice_data_generator -g genome_file.fa"
+    print "-g: Location of genome file"
+    print "--max_size=N: integer for max size of sequence"
+    print "--min_size=N: integer for minimum size of sequence"
+    print "-n N: integer for number of sequences to generate"
+
+genome_loc=''
+sequences_to_generate=50
+
+max_size=24
+min_size=20
+gap = 100
+
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "hg:n:", ['max_size=', 'min_size='])
+except getopt.GetoptError as err:
+    print 'Usage error'
+    sys.exit(2)
+for opt, arg in opts:
+    if opt == '-g':
+        genome_loc = arg
+    elif opt == '-h':
+        display_help()
+        sys.exit(2)
+    elif opt in ('--max_size'):
+        max_size = int(arg)
+    elif opt in ('--min_size'):
+        min_size = int(arg)
+    elif opt == '-n':
+        sequences_to_generate=int(arg)
+
+if genome_loc == '':
+    print 'Must specify genome location with -g'
+    sys.exit(2)
+genome = str(SeqIO.parse(open(genome_loc, "rU"), "fasta").next().seq)
+
+splices=[]
+for i in range(0,sequences_to_generate):
+	size=random.randint(min_size,max_size)
+        splice = ''
+        for i in range(0, size):
+            base_n = random.randint(0,3)
+            base = ''
+            if base_n == 0:
+                base = 'A'
+            elif base_n == 1:
+                base = 'T'
+            elif base_n == 2:
+                base = 'G'
+            elif base_n == 3:
+                base = 'C'
+            splice += base
+        
+        if splice in genome:
+            continue
+
+	print '> splice ' + str(i) + '(' + 'NA' + ')'
+	print splice
+
+
+

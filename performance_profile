@@ -1,0 +1,129 @@
+#!/usr/bin/env python2
+import random,math
+import sys, getopt, os
+import time
+from Bio import SeqIO
+
+def display_help():
+    print "Usage: splice_data_generator -g genome_file.fa"
+    print "-g: Location of genome file"
+    print "--max_size=N: integer for max size of sequence"
+    print "--min_size=N: integer for minimum size of sequence"
+    print "-n N: integer for number of sequences to generate"
+    print "--gap N: integer for length of gap within genome between spliced sequences"
+
+def get_detected(filename):
+    f = open(filename)
+    valid_chars = ['A', 'T', 'G', 'C']
+    lines = 0
+    for line in f:
+        if line[0] in valid_chars:
+            lines += 1
+    return lines
+
+def get_reads_in_file(filename):
+    f = open(filename)
+    lines = 0
+    for line in f:
+        if line[0] != '>':
+            lines += 1
+    return lines
+
+positive_file = ''
+negative_file = ''
+genome_file = ''
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "hp:n:g:")
+except getopt.GetoptError as err:
+    print 'Usage error'
+    sys.exit(2)
+for opt, arg in opts:
+    if opt == '-p':
+        positive_file = arg
+    elif opt == '-h':
+        display_help()
+        sys.exit(2)
+    elif opt == '-n':
+        negative_file = arg
+    elif opt == '-g':
+        genome_file = arg
+
+if positive_file == '' or negative_file == '':
+    print 'Must specify positive FASTA file with -p'
+    sys.exit(2)
+elif negative_file == '':
+    print 'Must specify negative FASTA file with -n'
+    sys.exit(2)
+elif genome_file == '':
+    print 'Must specify genome file with -g'
+    sys.exit(2)
+
+
+print '--------------------------------------------------'
+print 'Beginning run with positive dataset'
+print '--------------------------------------------------'
+
+begin = time.time()
+os.system('./splice_detection -g ' + genome_file + ' -i ' + positive_file + ' > performance_positive_data.csv')
+finish = time.time()
+
+positive_time = finish - begin
+positive_reads = get_reads_in_file(positive_file)
+positive_time_per_read = positive_time/positive_reads
+
+positive_detected = get_detected('performance_positive_data.csv')
+
+if positive_reads != 0:
+    positive_detected_percentage = (positive_detected/float(positive_reads)) * 100
+else:
+    positive_detected_percentage = 0
+
+positive_time = round(positive_time, 4)
+positive_time_per_read = round(positive_time_per_read, 4)
+positive_detected_percentage = round(positive_detected_percentage, 3)
+
+print '--------------------------------------------------'
+print 'Ending run with positive dataset'
+print '--------------------------------------------------'
+print '\n'
+
+print '--------------------------------------------------'
+print 'Beginning run with negative dataset'
+print '--------------------------------------------------'
+
+begin = time.time()
+os.system('./splice_detection -g ' + genome_file + ' -i ' + negative_file + ' > performance_negative_data.csv')
+finish = time.time()
+
+negative_time = finish - begin
+negative_reads = get_reads_in_file(negative_file)
+negative_time_per_read = negative_time/negative_reads
+
+negative_detected = get_detected('performance_negative_data.csv')
+if negative_reads != 0:
+    negative_detected_percentage = (negative_detected/float(negative_reads)) * 100
+else:
+    negative_detected_percentage = 0
+
+negative_time = round(negative_time, 4)
+negative_time_per_read = round(negative_time_per_read, 4)
+negative_detected_percentage = round(negative_detected_percentage, 3)
+
+print '--------------------------------------------------'
+print 'Ending run with negative dataset'
+print '--------------------------------------------------'
+
+print '\n\n'
+print '--------------------------------------------------'
+print 'Performance report'
+print '--------------------------------------------------'
+print 'Total time elapsed: ' + str(positive_time+negative_time) + 's'
+print 'Time elapsed for positives: ' + str(positive_time) + 's'
+print 'Time elapsed for negatives: ' + str(negative_time) + 's'
+print 'Average time per read (positive): ' + str(positive_time_per_read) + 's'
+print 'Average time per read (negative): ' + str(negative_time_per_read) + 's'
+print 'Identified reads in positive dataset: ' + str(positive_detected_percentage) + '%'
+print 'Identified reads in negative dataset: ' + str(negative_detected_percentage) + '%'
+print '--------------------------------------------------'
+
