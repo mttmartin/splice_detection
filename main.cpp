@@ -424,7 +424,7 @@ bool splice_is_valid (int splice_site, string part1, string part2, int part1_loc
 	{
 		bool found1 = false;
 		bool found2 = false;
-		
+
 		for (int i=0; i < paramcontainer.cords.size(); i++)
 		{
 			int begin, end;
@@ -553,6 +553,8 @@ void check_for_splice(string read, string genome, struct ParamContainer paramcon
 			if (splice_is_valid (splice_loc, part1, part2, part1_loc, part2_loc, genome, paramcontainer))
 			{
 				output_detected_splice(original_read, part1, part1_loc, part2_loc, splice_loc, status, paramcontainer);
+				finished = true;
+				break;
 			}
 
 
