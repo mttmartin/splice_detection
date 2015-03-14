@@ -63,6 +63,99 @@ struct ParamContainer
 	vector<ORF_Cordinate> cords; 
 };
 
+class ThreadPool
+{
+	bool finished;
+	vector<thread> threads;
+	vector<function<void()>> read_queue;
+
+	mutex queue_mutex;
+
+
+	void worker();
+
+	public:
+		ThreadPool();
+		ThreadPool(int thread_num);
+		void terminate();
+		void add_work(function<void()> read);
+	
+
+
+};
+
+ThreadPool::ThreadPool()
+{
+	int thread_num = thread::hardware_concurrency();
+	for (int i=0; i < thread_num; ++i)
+	{
+		threads.push_back(thread(&ThreadPool::worker, this));
+	}
+	
+}
+
+ThreadPool::ThreadPool(int thread_num)
+{
+	if (thread_num > threads.max_size())
+	{
+		cout << "Error: Thread number is too large.\n";
+		exit(1);
+	}
+	
+	for (int i=0; i < threads.size(); ++i)
+	{
+		threads.push_back(thread(&ThreadPool::worker, this));
+		
+	}
+
+}
+
+
+void ThreadPool::terminate()
+{
+	finished = true;
+	for (int i=0; i < threads.size(); ++i)
+	{
+		threads[i].join();
+	}
+}
+
+
+void ThreadPool::add_work(function<void()> read)
+{
+	queue_mutex.lock();
+	read_queue.push_back(read);
+	queue_mutex.unlock();
+}
+
+	
+void ThreadPool::worker()
+{
+	while((!finished) || (read_queue.size() > 0))
+	{
+		function<void()> seq;	
+			
+		queue_mutex.lock();
+			
+		if (read_queue.size() > 0)
+		{
+			seq = read_queue.back();
+			read_queue.pop_back();
+		}
+
+		queue_mutex.unlock();	
+
+		if (seq != NULL)
+		{
+			seq();
+		}
+		// Our queue was empty... wait a bit
+		else
+		{
+			this_thread::yield();	
+		}
+	}	
+}
 
 bool is_valid_read (string read)
 {
@@ -215,7 +308,12 @@ bool get_next_sequences (ifstream *file, vector<string> *queue)
 		do
 		{
 			if (file->eof())
+			{
+				// Wipe all the reads in the queue which are old
+				for (; i < queue->size(); i++)
+					(*queue)[i] = "";
 				return true;
+			}
 
 			getline(*file, buffer);
 
@@ -847,29 +945,23 @@ int main(int argc, char *argv[])
 
 	
 	output_CSV_header();
+	
+	ThreadPool pool;
+	
 	do
 	{
 		done = get_next_sequences(&read_file, &read_queue);
 
-		vector<thread> threads(queue_size);
-
-		
 		for (int i=0; i < queue_size; i++)
 		{
-			/*thread test (check_for_splice, read_queue[i], genome, paramcontainer);
-			test.join();*/
-			threads[i] = thread(check_for_splice, read_queue[i], genome, paramcontainer);
-						
-			//check_for_splice(read_queue[i], genome, paramcontainer);
+			function<void()> job = bind(check_for_splice, read_queue[i], genome, paramcontainer);
+			pool.add_work(job);
 		}
-
-		for (int i=0; i < queue_size; i++)
-		{
-			threads[i].join();
-		}
-
 
 	} while (!done);
+
+	pool.terminate();
+
 
 	return 0;
 }
