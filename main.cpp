@@ -364,6 +364,12 @@ bool is_in_genome (string read, string genome)
 
 string get_genome_chunk (int loc, int read_len, string genome, bool is_circular)
 {
+	if (loc > genome.length())
+	{
+		cerr << "Warning: Invalid location given to get_genome_chunk.\n";
+		return "";
+	}
+	
 	if (!is_circular)
 		return genome.substr(loc, read_len);
 	
@@ -371,7 +377,7 @@ string get_genome_chunk (int loc, int read_len, string genome, bool is_circular)
 		return genome.substr(loc, read_len);
 	else
 	{		
-		// Connect the end and beginning of genome by making this chunk span them		
+		// Connect the end and beginning of genome by making this chunk span them				
 		int first_part_len = genome.length() - loc;
 		int second_part_len = read_len - first_part_len;
 
@@ -606,7 +612,7 @@ void check_for_splice(string read, string genome, struct ParamContainer paramcon
 	
 	while (!finished)
 	{
-		for (int i=0; i < genome.length()+read_len; i++)
+		for (int i=0; i < genome.length(); i++)
 		{
 			if ((!paramcontainer.circular_genome) && (i < genome.length()-read_len))
 				break;
