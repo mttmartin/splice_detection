@@ -713,6 +713,7 @@ int main(int argc, char *argv[])
 		// intron_minimum: --intron_min
 		// intron_maximum: --intron_max
 		// ignore_noncoding: --ignore-noncoding
+		// linear_genome: --linear_genome
 
 		if ( (strncmp(argv[i], "-", 1) == 0) || (strncmp(argv[i], "--", 2) == 0))
 		{
@@ -801,6 +802,10 @@ int main(int argc, char *argv[])
 			else if (strcmp(argv[i], "--ignore-noncoding") == 0)
 			{
 				paramcontainer.ignore_noncoding = true;
+			}
+			else if (strcmp(argv[i], "--linear_genome") == 0)
+			{
+				paramcontainer.circular_genome = false;
 			}
 			else if (strcmp(argv[i], "-gff") == 0)
 			{
