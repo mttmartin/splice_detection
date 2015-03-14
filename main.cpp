@@ -58,6 +58,7 @@ struct ParamContainer
 	int do_reverse;
 
 	bool ignore_noncoding;
+	bool circular_genome;
 
 	vector<ORF_Cordinate> cords; 
 };
@@ -262,35 +263,96 @@ int reverse_compliment(string *read)
 	return 0;
 }
 
-int location_in_genome (string read, string genome)
+int location_in_genome (string read, string genome, bool is_circular)
 {
 	size_t location;
 	int max_mismatch = 1;
 	
 
-	location = genome.find(read);
-	
-	// if no perfect match was found, try given our allowed mismatches
-	if (location == string::npos)
+
+	if (!is_circular)
 	{
-		for (int i=0, mismatches=0; i < genome.length() - read.length(); i++)
+		location = genome.find(read);
+
+		if (location == string::npos)
 		{
-			for (int j=0; j < read.length(); j++)
+			for (int i=0, mismatches=0; i < genome.length() - read.length(); i++)
+			{
+				mismatches=0;
+				for (int j=0; j < read.length(); j++)
+				{
+					if (read[j] != genome[i+j])
+						mismatches++;
+				}
+				if (mismatches < max_mismatch)
+					return i;
+			}
+
+		}
+		else
+			return location;
+	}
+
+
+	
+	// Try to first find a perfect match, then try to find an imperfect match
+	for (int i=0, mismatches=0; i < genome.length() + read.length(); i++)
+	{
+		mismatches=0;
+		for (int j=0; j < read.length(); j++)
+		{
+			if (i+j < genome.length())
 			{
 				if (read[j] != genome[i+j])
 					mismatches++;
 			}
-			if (mismatches < max_mismatch)
-				return i;
-		}
+			else if (i+j > genome.length())
+			{
+				
+				int first_part = genome.length()-i;
+				int second_part = read.length()-first_part;
+				int genome_loc = (j-first_part)-1;
+				
 
+				if (read[j] != genome[genome_loc])
+					mismatches++;
+			}
+
+		}
+		if (mismatches == 0)
+			return i;
 	}
-	else
-		return location;
 	
-	// check if matches with mismatch
+	// if no perfect match was found, try given our allowed mismatches
+	for (int i=0, mismatches=0; i < genome.length() + read.length(); i++)
+	{
+		mismatches=0;
+		for (int j=0; j < read.length(); j++)
+		{
+			if (i+j < genome.length())
+			{
+				if (read[j] != genome[i+j])
+					mismatches++;
+
+			}
+			else if (i+j > genome.length())
+			{
+				int first_part = genome.length()-i;
+				int second_part = read.length()-first_part;
+				
+				int genome_loc = (j-first_part);
+				if (read[j] != genome[genome_loc])
+					mismatches++;
+			}
+
+		}
+		if (mismatches <= max_mismatch)
+			return i;
+	}
+	
 	return 0;
 }
+
 
 bool is_in_genome (string read, string genome)
 {
@@ -300,9 +362,24 @@ bool is_in_genome (string read, string genome)
 	return false;
 }
 
-string get_genome_chunk (int loc, int read_len, string genome)
+string get_genome_chunk (int loc, int read_len, string genome, bool is_circular)
 {
-	return genome.substr(loc, read_len);
+	if (!is_circular)
+		return genome.substr(loc, read_len);
+	
+	if (loc+read_len < genome.length())
+		return genome.substr(loc, read_len);
+	else
+	{		
+		// Connect the end and beginning of genome by making this chunk span them		
+		int first_part_len = genome.length() - loc;
+		int second_part_len = read_len - first_part_len;
+
+		string first = genome.substr(loc, first_part_len);
+		string second = genome.substr(0, second_part_len);
+
+		return first+second;
+	}
 }
 
 /* revise_splice_loc (string read, string genome, int splice_site)
@@ -529,11 +606,14 @@ void check_for_splice(string read, string genome, struct ParamContainer paramcon
 	
 	while (!finished)
 	{
-		for (int i=0; i < genome.length()-read_len; i++)
+		for (int i=0; i < genome.length()+read_len; i++)
 		{
+			if ((!paramcontainer.circular_genome) && (i < genome.length()-read_len))
+				break;
+
 			string part1, part2;
 			int part1_loc, part2_loc;
-			string genome_chunk = get_genome_chunk(i, read_len, genome);
+			string genome_chunk = get_genome_chunk(i, read_len, genome, paramcontainer.circular_genome);
 			int splice_loc = determine_splice_loc(read, genome_chunk, paramcontainer);
 			splice_loc = revise_splice_site (read, genome, splice_loc);
 			
@@ -547,8 +627,8 @@ void check_for_splice(string read, string genome, struct ParamContainer paramcon
 			part1 = read.substr(0, splice_loc);
 			part2 = read.substr(splice_loc);
 
-			part1_loc = location_in_genome (part1, genome);
-			part2_loc = location_in_genome (part2, genome);
+			part1_loc = location_in_genome (part1, genome, paramcontainer.circular_genome);
+			part2_loc = location_in_genome (part2, genome, paramcontainer.circular_genome);
 
 			if (splice_is_valid (splice_loc, part1, part2, part1_loc, part2_loc, genome, paramcontainer))
 			{
@@ -604,7 +684,7 @@ int main(int argc, char *argv[])
 	paramcontainer.do_reverse = 1;
 
 	paramcontainer.ignore_noncoding = false;
-	
+	paramcontainer.circular_genome = true;
 
 	int queue_size = 5;
 
