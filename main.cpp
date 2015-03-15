@@ -76,7 +76,7 @@ class ThreadPool
 
 	public:
 		ThreadPool();
-		ThreadPool(int thread_num);
+		ThreadPool(int threads_requested);
 		void terminate();
 		void add_work(function<void()> read);
 	
@@ -94,18 +94,29 @@ ThreadPool::ThreadPool()
 	
 }
 
-ThreadPool::ThreadPool(int thread_num)
+ThreadPool::ThreadPool(int threads_requested)
 {
-	if (thread_num > threads.max_size())
+	int thread_num;
+	
+	if (threads_requested > threads.max_size())
 	{
 		cout << "Error: Thread number is too large.\n";
 		exit(1);
 	}
-	
-	for (int i=0; i < threads.size(); ++i)
+	else if (threads_requested < 0)
 	{
-		threads.push_back(thread(&ThreadPool::worker, this));
-		
+		cerr << "Error: Thread number must be greater than 0.\n";
+		exit(1);
+	}
+	
+	if (threads_requested == 0)
+		thread_num = thread::hardware_concurrency();
+	else
+		thread_num = threads_requested;
+
+	for (int i=0; i < thread_num; ++i)
+	{
+		threads.push_back(thread(&ThreadPool::worker, this));		
 	}
 
 }
@@ -189,7 +200,6 @@ int get_genome(string filename, string *genome)
 {
 	ifstream f;
 	string line_buffer;
-	//string genome;
 	
 	f.open(filename);
 	
@@ -702,7 +712,6 @@ void output_detected_splice (string read, string part1, int part1_loc, int part2
 
 void check_for_splice(string read, string genome, struct ParamContainer paramcontainer)
 {
-
 	int status = ON_DEFAULT;
 	bool finished = false;
 	int read_len = read.length();
@@ -721,7 +730,6 @@ void check_for_splice(string read, string genome, struct ParamContainer paramcon
 			int splice_loc = determine_splice_loc(read, genome_chunk, paramcontainer);
 			splice_loc = revise_splice_site (read, genome, splice_loc);
 			
-		//	cout << "Splice: " << splice_loc << endl;	
 			if (!(splice_loc > 0))
 			{
 				finished = true;
@@ -767,6 +775,7 @@ int main(int argc, char *argv[])
 	string gff_file_loc;
 	ifstream read_file;
 	bool done = false;
+	int threads=0;
 	
 
 	struct ParamContainer paramcontainer;
@@ -844,7 +853,7 @@ int main(int argc, char *argv[])
 			}
 			else if ( (strcmp(argv[i], "--threads") == 0) || (strcmp(argv[i], "-t") == 0))
 			{
-				queue_size = atoi(argv[i+1]);
+				threads = atoi(argv[i+1]);
 			}
 			else if ( (strcmp(argv[i], "--seed_len") == 0) || (strcmp(argv[i], "-s") == 0))
 			{
@@ -946,7 +955,7 @@ int main(int argc, char *argv[])
 	
 	output_CSV_header();
 	
-	ThreadPool pool;
+	ThreadPool pool(threads);
 	
 	do
 	{
