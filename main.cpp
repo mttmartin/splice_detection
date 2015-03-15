@@ -213,7 +213,13 @@ int get_genome(string filename, string *genome)
 	{
 		if (line_buffer.front() == '>')
 			continue;
-
+		
+		if (!is_valid_read(line_buffer))
+		{
+			cerr << "Genome file contains illegal characters or is invalid.\n";
+			exit(1);
+		}
+		
 		genome->append(line_buffer);
 
 	}
