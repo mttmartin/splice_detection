@@ -67,7 +67,7 @@ class ThreadPool
 {
 	bool finished;
 	vector<thread> threads;
-	vector<function<void()>> read_queue;
+	vector<function<void()>> work_queue;
 
 	mutex queue_mutex;
 
@@ -78,7 +78,7 @@ class ThreadPool
 		ThreadPool();
 		ThreadPool(int threads_requested);
 		void terminate();
-		void add_work(function<void()> read);
+		void add_work(function<void()> work);
 	
 
 
@@ -132,33 +132,33 @@ void ThreadPool::terminate()
 }
 
 
-void ThreadPool::add_work(function<void()> read)
+void ThreadPool::add_work(function<void()> work)
 {
 	queue_mutex.lock();
-	read_queue.push_back(read);
+	work_queue.push_back(work);
 	queue_mutex.unlock();
 }
 
 	
 void ThreadPool::worker()
 {
-	while((!finished) || (read_queue.size() > 0))
+	while((!finished) || (work_queue.size() > 0))
 	{
-		function<void()> seq;	
-			
+		function<void()> work;
+		
 		queue_mutex.lock();
 			
-		if (read_queue.size() > 0)
+		if (work_queue.size() > 0)
 		{
-			seq = read_queue.back();
-			read_queue.pop_back();
+			work = work_queue.back();
+			work_queue.pop_back();
 		}
 
 		queue_mutex.unlock();	
 
-		if (seq != NULL)
+		if (work != NULL)
 		{
-			seq();
+			work();
 		}
 		// Our queue was empty... wait a bit
 		else
