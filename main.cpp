@@ -168,6 +168,77 @@ void ThreadPool::worker()
 	}	
 }
 
+int generate_KMP_table(string seq, string genome, vector<int> *T)
+{
+	int pos = 2;
+	int cnd = 0;
+
+	(*T)[0] = -1;
+	(*T)[1] = 0;
+
+	while (pos < seq.length())
+	{
+		if (seq[pos-1] == seq[cnd])
+		{
+			cnd++;
+			(*T)[pos] = cnd;
+			pos++;
+		}
+		else if (cnd > 0)
+		{
+			cnd = (*T)[cnd];
+		}
+		else
+		{
+			(*T)[pos] = 0;
+			pos++;
+		}
+	}
+
+	return 0;
+
+
+}
+
+int KMP_search(string seq, string genome)
+{
+	int i = 0;
+	int m = 0;
+	int max_mismatches = 1;
+
+	int S_len = genome.length();
+	int W_len = seq.length();
+
+	vector<int> T(genome.length());
+	generate_KMP_table(seq, genome, &T);
+
+	while (m+i < S_len)
+	{
+		if (seq[i] == genome[i+m])
+		{
+			if (i == W_len -1)
+				return m;
+			i++;
+		}
+		else
+		{
+			if (T[i] > -1)
+			{
+				m = m + i - T[i];
+				i = T[i];
+			}
+			else
+			{
+				i = 0;
+				m++;
+			}
+		}
+	}
+
+	return -1;
+}
+
+
 bool is_valid_read (string read)
 {
 	vector<char> allowed {'A', 'T', 'G', 'C'};
