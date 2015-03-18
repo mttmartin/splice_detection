@@ -7,6 +7,7 @@
 #include <mutex>
 #include <sstream>
 #include <string.h>
+#include <seqan/find.h>
 #define current_version "0.1.1"
 
 
@@ -167,77 +168,6 @@ void ThreadPool::worker()
 		}
 	}	
 }
-
-int generate_KMP_table(string seq, string genome, vector<int> *T)
-{
-	int pos = 2;
-	int cnd = 0;
-
-	(*T)[0] = -1;
-	(*T)[1] = 0;
-
-	while (pos < seq.length())
-	{
-		if (seq[pos-1] == seq[cnd])
-		{
-			cnd++;
-			(*T)[pos] = cnd;
-			pos++;
-		}
-		else if (cnd > 0)
-		{
-			cnd = (*T)[cnd];
-		}
-		else
-		{
-			(*T)[pos] = 0;
-			pos++;
-		}
-	}
-
-	return 0;
-
-
-}
-
-int KMP_search(string seq, string genome)
-{
-	int i = 0;
-	int m = 0;
-	int max_mismatches = 1;
-
-	int S_len = genome.length();
-	int W_len = seq.length();
-
-	vector<int> T(genome.length());
-	generate_KMP_table(seq, genome, &T);
-
-	while (m+i < S_len)
-	{
-		if (seq[i] == genome[i+m])
-		{
-			if (i == W_len -1)
-				return m;
-			i++;
-		}
-		else
-		{
-			if (T[i] > -1)
-			{
-				m = m + i - T[i];
-				i = T[i];
-			}
-			else
-			{
-				i = 0;
-				m++;
-			}
-		}
-	}
-
-	return -1;
-}
-
 
 bool is_valid_read (string read)
 {
@@ -448,94 +378,33 @@ int reverse_compliment(string *read)
 	return 0;
 }
 
-int location_in_genome (string read, string genome, bool is_circular)
+
+int location_in_genome (string read, string genome)
 {
-	size_t location;
-	int max_mismatch = 1;
-	
+	using namespace seqan;
+	int location = -1;
 
 
-	if (!is_circular)
-	{
-		location = genome.find(read);
 
-		if (location == string::npos)
+	CharString haystack = genome;
+	CharString needle = read;
+
+	Finder<String<char>> fnd(haystack);
+	Pattern<String<char>, MyersUkkonen> pat(needle);
+	setScoreLimit(pat, -1);
+	while (find(fnd, pat))
+		while (findBegin(fnd, pat, getScore(pat)))
 		{
-			for (int i=0, mismatches=0; i < genome.length() - read.length(); i++)
+			int score = getBeginScore(pat);
+			if (score == 0)
 			{
-				mismatches=0;
-				for (int j=0; j < read.length(); j++)
-				{
-					if (read[j] != genome[i+j])
-						mismatches++;
-				}
-				if (mismatches < max_mismatch)
-					return i;
+				return beginPosition(fnd)-read.length();
 			}
-
+			else
+				location = beginPosition(fnd)-read.length();
 		}
-		else
-			return location;
-	}
-
-
 	
-	// Try to first find a perfect match, then try to find an imperfect match
-	for (int i=0, mismatches=0; i < genome.length() + read.length(); i++)
-	{
-		mismatches=0;
-		for (int j=0; j < read.length(); j++)
-		{
-			if (i+j < genome.length())
-			{
-				if (read[j] != genome[i+j])
-					mismatches++;
-			}
-			else if (i+j > genome.length())
-			{
-				
-				int first_part = genome.length()-i;
-				int second_part = read.length()-first_part;
-				int genome_loc = (j-first_part)-1;
-				
-
-				if (read[j] != genome[genome_loc])
-					mismatches++;
-			}
-
-		}
-		if (mismatches == 0)
-			return i;
-	}
-	
-	// if no perfect match was found, try given our allowed mismatches
-	for (int i=0, mismatches=0; i < genome.length() + read.length(); i++)
-	{
-		mismatches=0;
-		for (int j=0; j < read.length(); j++)
-		{
-			if (i+j < genome.length())
-			{
-				if (read[j] != genome[i+j])
-					mismatches++;
-
-			}
-			else if (i+j > genome.length())
-			{
-				int first_part = genome.length()-i;
-				int second_part = read.length()-first_part;
-				
-				int genome_loc = (j-first_part);
-				if (read[j] != genome[genome_loc])
-					mismatches++;
-			}
-
-		}
-		if (mismatches <= max_mismatch)
-			return i;
-	}
-	
-	return 0;
+	return location;	
 }
 
 
@@ -812,12 +681,18 @@ void check_for_splice(string read, string genome, struct ParamContainer paramcon
 				finished = true;
 				break;
 			}
+			if (splice_loc >= read.length())
+				continue;
 			
 			part1 = read.substr(0, splice_loc);
-			part2 = read.substr(splice_loc);
+			part2 = read.substr(splice_loc);			
 
-			part1_loc = location_in_genome (part1, genome, paramcontainer.circular_genome);
-			part2_loc = location_in_genome (part2, genome, paramcontainer.circular_genome);
+		
+			// It is known part1 is in the genome_chunk, so only consider it and then add current location(i) to the location
+			part1_loc = location_in_genome (part1, genome_chunk);
+			part1_loc = part1_loc + i;
+		
+			part2_loc = location_in_genome (part2, genome);
 
 			if (splice_is_valid (splice_loc, part1, part2, part1_loc, part2_loc, genome, paramcontainer))
 			{
@@ -876,7 +751,7 @@ int main(int argc, char *argv[])
 	paramcontainer.ignore_noncoding = false;
 	paramcontainer.circular_genome = true;
 
-	int queue_size = 5;
+	int queue_size = 10;
 
 	if (argc < 2)
 	{
@@ -1037,6 +912,9 @@ int main(int argc, char *argv[])
 	do
 	{
 		done = get_next_sequences(&read_file, &read_queue);
+
+		vector<thread> threads;
+
 
 		for (int i=0; i < queue_size; i++)
 		{
