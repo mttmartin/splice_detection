@@ -384,24 +384,27 @@ int location_in_genome (string read, string genome)
 	using namespace seqan;
 	int location = -1;
 
+	CharString genome_string = genome;
+	CharString read_string = read;
 
+	Finder<String<char>> finder(genome_string);
+	Pattern<String<char>, MyersUkkonen> pattern(read_string);
 
-	CharString haystack = genome;
-	CharString needle = read;
-
-	Finder<String<char>> fnd(haystack);
-	Pattern<String<char>, MyersUkkonen> pat(needle);
-	setScoreLimit(pat, -1);
-	while (find(fnd, pat))
-		while (findBegin(fnd, pat, getScore(pat)))
+	setScoreLimit(pattern, -1);
+	while (find(finder, pattern))
+		while (findBegin(finder, pattern, getScore(pattern)))
 		{
-			int score = getBeginScore(pat);
+			int score = getBeginScore(pattern);
 			if (score == 0)
 			{
-				return beginPosition(fnd)-read.length();
+				// Substract read length to get real beginning location
+				return beginPosition(finder)-read.length();
 			}
 			else
-				location = beginPosition(fnd)-read.length();
+			{
+				// Subtract read length to get real beginning location
+				location = beginPosition(finder)-read.length();
+			}
 		}
 	
 	return location;	
