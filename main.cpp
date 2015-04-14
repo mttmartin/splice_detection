@@ -6,6 +6,7 @@
 #include <thread>
 #include <mutex>
 #include <sstream>
+#include <ctime>
 #include <string.h>
 #include <seqan/find.h>
 #define current_version "0.1.1"
@@ -15,6 +16,7 @@ using namespace std;
 
 
 mutex cout_mutex;
+mutex param_mutex;
 
 enum {ON_DEFAULT, ON_REVERSE, ON_ANTI};
 
@@ -60,6 +62,14 @@ struct ParamContainer
 
 	bool ignore_noncoding;
 	bool circular_genome;
+
+	string read_loc;
+	string genome_loc;
+	string gff_file_loc;
+	string status_loc;
+
+	int total_reads;
+	int detected_splice_events;
 
 	vector<ORF_Cordinate> cords; 
 };
@@ -657,26 +667,31 @@ void output_detected_splice (string read, string part1, int part1_loc, int part2
 	cout_mutex.lock();
 	cout << read << "," << donor_loc << "," << acceptor_loc << "," << splice_loc << "," << read_len << "," << intron_len << "," << read_pol << "," << part1_ORF << "," << part2_ORF << "," << same_ORF << endl;
 	cout_mutex.unlock();
+
 }
 
-void check_for_splice(string read, string genome, struct ParamContainer paramcontainer)
+void check_for_splice(string read, string genome, struct ParamContainer *paramcontainer)
 {
 	int status = ON_DEFAULT;
 	bool finished = false;
 	int read_len = read.length();
 	string original_read = read;
-	
+				
+	param_mutex.lock();
+	paramcontainer->total_reads++;
+	param_mutex.unlock();
+
 	while (!finished)
 	{
 		for (int i=0; i < genome.length(); i++)
 		{
-			if ((!paramcontainer.circular_genome) && (i < genome.length()-read_len))
+			if ((!paramcontainer->circular_genome) && (i < genome.length()-read_len))
 				break;
 
 			string part1, part2;
 			int part1_loc, part2_loc;
-			string genome_chunk = get_genome_chunk(i, read_len, genome, paramcontainer.circular_genome);
-			int splice_loc = determine_splice_loc(read, genome_chunk, paramcontainer);
+			string genome_chunk = get_genome_chunk(i, read_len, genome, paramcontainer->circular_genome);
+			int splice_loc = determine_splice_loc(read, genome_chunk, *paramcontainer);
 			splice_loc = revise_splice_site (read, genome, splice_loc);
 			
 			if (!(splice_loc > 0))
@@ -697,9 +712,14 @@ void check_for_splice(string read, string genome, struct ParamContainer paramcon
 		
 			part2_loc = location_in_genome (part2, genome);
 
-			if (splice_is_valid (splice_loc, part1, part2, part1_loc, part2_loc, genome, paramcontainer))
+			if (splice_is_valid (splice_loc, part1, part2, part1_loc, part2_loc, genome, *paramcontainer))
 			{
-				output_detected_splice(original_read, part1, part1_loc, part2_loc, splice_loc, status, paramcontainer);
+				output_detected_splice(original_read, part1, part1_loc, part2_loc, splice_loc, status, *paramcontainer);
+				
+				param_mutex.lock();
+				paramcontainer->detected_splice_events++;
+				param_mutex.unlock();
+
 				finished = true;
 				break;
 			}
@@ -707,12 +727,12 @@ void check_for_splice(string read, string genome, struct ParamContainer paramcon
 
 		}
 		
-		if ((paramcontainer.do_reverse) && (status != ON_REVERSE))
+		if ((paramcontainer->do_reverse) && (status != ON_REVERSE))
 		{
 			reverse_read(&read);
 			status = ON_REVERSE;
 		}
-		if ((paramcontainer.do_anti_sense) && (status != ON_ANTI))
+		if ((paramcontainer->do_anti_sense) && (status != ON_ANTI))
 		{
 
 			reverse_compliment(&read);
@@ -723,11 +743,28 @@ void check_for_splice(string read, string genome, struct ParamContainer paramcon
 	}
 }
 
+void write_status_log(string status_log_loc, ParamContainer paramcontainer)
+{
+	ofstream out;
+	out.open(status_log_loc);
+	time_t current_time = time(NULL);
+
+
+	out << "Date: " << asctime(std::localtime(&current_time));
+	out << "Genome input: " << paramcontainer.genome_loc << endl;
+	out << "Read input: " << paramcontainer.read_loc << endl;
+	out << "Total number of reads processed: " << paramcontainer.total_reads << endl;
+	out << "Total number of splicing events detected: " << paramcontainer.detected_splice_events << endl;
+
+	out.close();
+}
+
 int main(int argc, char *argv[])
 {
-	string filename = "genome.fa";
+	string filename;
 	string genome;
 	string gff_file_loc;
+	string status_log_loc;
 	ifstream read_file;
 	bool done = false;
 	int threads=0;
@@ -794,17 +831,20 @@ int main(int argc, char *argv[])
 					cerr << "Error opening input file located at " << argv[i+1] << endl;
 					exit (1);
 				}
+				paramcontainer.read_loc = argv[i+1];
+
 			}
 			else if ( (strcmp(argv[i], "--genome") == 0) || (strcmp(argv[i], "-g") == 0))
 			{
 				cerr << "Genome file: " << argv[i+1] << endl;
 				get_genome(argv[i+1], &genome);
+				paramcontainer.genome_loc = argv[i+1];
 			}
 			else if ( (strcmp(argv[i], "--status_log") == 0) || (strcmp(argv[i], "-l") == 0))
 			{
 				cout << "Status log: " << argv[i+1];
-				/*status_log_file_loc = malloc(sizeof(char)*strlen(argv[i+1]));
-				strncpy(status_log_file_loc, argv[i+1], strlen(argv[i+1]));*/
+				status_log_loc = argv[i+1];
+				paramcontainer.status_loc = argv[i+1];
 			}
 			else if ( (strcmp(argv[i], "--threads") == 0) || (strcmp(argv[i], "-t") == 0))
 			{
@@ -921,7 +961,7 @@ int main(int argc, char *argv[])
 
 		for (int i=0; i < queue_size; i++)
 		{
-			function<void()> job = bind(check_for_splice, read_queue[i], genome, paramcontainer);
+			function<void()> job = bind(check_for_splice, read_queue[i], genome, &paramcontainer);
 			pool.add_work(job);
 		}
 
@@ -929,6 +969,8 @@ int main(int argc, char *argv[])
 
 	pool.terminate();
 
+	if (status_log_loc != "")
+		write_status_log(status_log_loc, paramcontainer);
 
 	return 0;
 }
