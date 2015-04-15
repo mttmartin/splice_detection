@@ -74,6 +74,63 @@ struct ParamContainer
 	vector<ORF_Cordinate> cords; 
 };
 
+class Read
+{
+	string sequence;
+	int frequency;
+	
+	public:
+		Read();
+		Read(string seq);
+		Read(string sequence, int frequency);
+		string get_sequence();
+		int get_frequency();
+		void set_frequency(int frequency);
+		void create(string sequence, int frequency);
+		int length();
+};
+
+Read::Read()
+{
+	return;
+}
+Read::Read(string seq)
+{
+	this->sequence = seq;
+}
+
+Read::Read(string sequence, int frequency)
+{
+	this->sequence = sequence;
+	this->frequency = frequency;
+}
+
+string Read::get_sequence()
+{
+	return sequence;
+}
+
+int Read::get_frequency()
+{
+	return frequency;
+}
+
+void Read::set_frequency(int frequency)
+{
+	this->frequency = frequency;
+}
+
+void Read::create(string sequence, int frequency)
+{
+	this->sequence = sequence;
+	this->frequency = frequency;
+}
+
+int Read::length()
+{
+	return sequence.length();
+}
+
 class ThreadPool
 {
 	bool finished;
@@ -324,37 +381,50 @@ bool get_ORFS(string filename, ParamContainer *paramcontainer)
 	return true;
 }
 
-bool get_next_sequences (ifstream *file, vector<string> *queue)
+bool get_next_sequences (ifstream *file, vector<Read> &queue)
 {
 
 
-	for (int i=0; i < queue->size(); i++)
+	for (int i=0; i < queue.size(); i++)
 	{
 		string buffer;
+		int frequency=1;
+
 	
 		do
 		{
 			if (file->eof())
 			{
 				// Wipe all the reads in the queue which are old
-				for (; i < queue->size(); i++)
-					(*queue)[i] = "";
+				for (; i < queue.size(); i++)
+					queue[i].create("", 0);
+				
 				return true;
 			}
 
+
 			getline(*file, buffer);
+			
+			if (buffer.front() == '>')
+			{
+				size_t left_p = buffer.find("(");
+				size_t right_p = buffer.find(")");
+				if (right_p > left_p)
+				{	
+					int freq_len = right_p-left_p;
+					string freq_buffer = buffer.substr(left_p+1, freq_len-1);
+					frequency = atoi(freq_buffer.c_str());
+				}
+			}
 
 
 			
 		} while ((buffer.front() == '>') || !(is_valid_read(buffer)));
 
-
-		(*queue)[i] = buffer;	
+		queue[i].create(buffer, frequency);
 	}
 
 return false;
-
-
 
 }
 
@@ -607,13 +677,14 @@ bool splice_is_valid (int splice_site, string part1, string part2, int part1_loc
 
 void output_CSV_header ()
 {
-	cout << "read, donor_loc, acceptor_loc, splice_loc, read_len, intron_len, read_pol, part1_ORF, part2_ORF, same_ORF\n";
+	cout << "read, donor_loc, acceptor_loc, splice_loc, read_len, intron_len, read_pol, part1_ORF, part2_ORF, same_ORF, frequency\n";
 }
 
-void output_detected_splice (string read, string part1, int part1_loc, int part2_loc, int splice_loc, int status, ParamContainer paramcontainer)
+void output_detected_splice (Read read, string part1, int part1_loc, int part2_loc, int splice_loc, int status, ParamContainer paramcontainer)
 {
 	char read_pol = '+';
 	char same_ORF = '-';
+	int frequency = read.get_frequency();
 	int donor_loc = part1_loc + part1.length();
 	int acceptor_loc = part2_loc;
 	int intron_len = acceptor_loc - donor_loc;
@@ -665,17 +736,18 @@ void output_detected_splice (string read, string part1, int part1_loc, int part2
 
 
 	cout_mutex.lock();
-	cout << read << "," << donor_loc << "," << acceptor_loc << "," << splice_loc << "," << read_len << "," << intron_len << "," << read_pol << "," << part1_ORF << "," << part2_ORF << "," << same_ORF << endl;
+	cout << read.get_sequence() << "," << donor_loc << "," << acceptor_loc << "," << splice_loc << "," << read_len << "," << intron_len << "," << read_pol << "," << part1_ORF << "," << part2_ORF << "," << same_ORF << "," << frequency << endl;
 	cout_mutex.unlock();
 
 }
 
-void check_for_splice(string read, string genome, struct ParamContainer *paramcontainer)
+//void check_for_splice(string read, string genome, struct ParamContainer *paramcontainer)
+void check_for_splice(Read read, string genome, struct ParamContainer *paramcontainer)
 {
+	string read_seq = read.get_sequence();
 	int status = ON_DEFAULT;
 	bool finished = false;
 	int read_len = read.length();
-	string original_read = read;
 				
 	param_mutex.lock();
 	paramcontainer->total_reads++;
@@ -691,8 +763,8 @@ void check_for_splice(string read, string genome, struct ParamContainer *paramco
 			string part1, part2;
 			int part1_loc, part2_loc;
 			string genome_chunk = get_genome_chunk(i, read_len, genome, paramcontainer->circular_genome);
-			int splice_loc = determine_splice_loc(read, genome_chunk, *paramcontainer);
-			splice_loc = revise_splice_site (read, genome, splice_loc);
+			int splice_loc = determine_splice_loc(read_seq, genome_chunk, *paramcontainer);
+			splice_loc = revise_splice_site (read_seq, genome, splice_loc);
 			
 			if (!(splice_loc > 0))
 			{
@@ -702,8 +774,8 @@ void check_for_splice(string read, string genome, struct ParamContainer *paramco
 			if (splice_loc >= read.length())
 				continue;
 			
-			part1 = read.substr(0, splice_loc);
-			part2 = read.substr(splice_loc);			
+			part1 = read_seq.substr(0, splice_loc);
+			part2 = read_seq.substr(splice_loc);			
 
 		
 			// It is known part1 is in the genome_chunk, so only consider it and then add current location(i) to the location
@@ -714,7 +786,7 @@ void check_for_splice(string read, string genome, struct ParamContainer *paramco
 
 			if (splice_is_valid (splice_loc, part1, part2, part1_loc, part2_loc, genome, *paramcontainer))
 			{
-				output_detected_splice(original_read, part1, part1_loc, part2_loc, splice_loc, status, *paramcontainer);
+				output_detected_splice(read, part1, part1_loc, part2_loc, splice_loc, status, *paramcontainer);
 				
 				param_mutex.lock();
 				paramcontainer->detected_splice_events++;
@@ -729,13 +801,13 @@ void check_for_splice(string read, string genome, struct ParamContainer *paramco
 		
 		if ((paramcontainer->do_reverse) && (status != ON_REVERSE))
 		{
-			reverse_read(&read);
+			reverse_read(&read_seq);
 			status = ON_REVERSE;
 		}
 		if ((paramcontainer->do_anti_sense) && (status != ON_ANTI))
 		{
 
-			reverse_compliment(&read);
+			reverse_compliment(&read_seq);
 			status = ON_ANTI;
 		}
 		if ((status == ON_DEFAULT) || (status == ON_ANTI))
@@ -945,8 +1017,8 @@ int main(int argc, char *argv[])
 	}
 	
 
-	vector<string> read_queue(queue_size);
-
+	vector<Read> read_queue(queue_size);
+	vector<Read> reads(4);
 	
 	output_CSV_header();
 	
@@ -954,7 +1026,7 @@ int main(int argc, char *argv[])
 	
 	do
 	{
-		done = get_next_sequences(&read_file, &read_queue);
+		done = get_next_sequences(&read_file, read_queue);
 
 		vector<thread> threads;
 
