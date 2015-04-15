@@ -1044,5 +1044,7 @@ int main(int argc, char *argv[])
 	if (status_log_loc != "")
 		write_status_log(status_log_loc, paramcontainer);
 
+	read_file.close();
+
 	return 0;
 }
