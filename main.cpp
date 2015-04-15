@@ -1018,7 +1018,6 @@ int main(int argc, char *argv[])
 	
 
 	vector<Read> read_queue(queue_size);
-	vector<Read> reads(4);
 	
 	output_CSV_header();
 	
