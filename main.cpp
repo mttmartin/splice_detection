@@ -461,6 +461,10 @@ int reverse_compliment(string *read)
 
 int location_in_genome (string read, string genome)
 {
+	// If we got passed bad input, reject it
+	if (read == "")
+		return -1;
+
 	using namespace seqan;
 	int location = -1;
 
@@ -472,7 +476,6 @@ int location_in_genome (string read, string genome)
 
 	setScoreLimit(pattern, -1);
 	while (find(finder, pattern))
-		while (findBegin(finder, pattern, getScore(pattern)))
 		{
 			int score = getBeginScore(pattern);
 			if (score == 0)
@@ -493,7 +496,9 @@ int location_in_genome (string read, string genome)
 
 bool is_in_genome (string read, string genome)
 {
-	if (genome.find(read) != string::npos)
+	if (read == "")
+		cout << "Error blank read!";
+	if (location_in_genome(read,genome) >= 0)
 		return true;
 	
 	return false;
@@ -631,7 +636,6 @@ int determine_splice_loc (string seq, string chunk, struct ParamContainer paramc
 	
 bool splice_is_valid (int splice_site, string part1, string part2, int part1_loc, int part2_loc, string genome, struct ParamContainer paramcontainer)
 {
-	
 	int intron_len = part2_loc - (part1_loc + part1.length());
 	
 	if (paramcontainer.intron_min > 0 && intron_len < paramcontainer.intron_min)
@@ -666,11 +670,10 @@ bool splice_is_valid (int splice_site, string part1, string part2, int part1_loc
 			return false;
 	}
 
-
 	if (part1.length() > paramcontainer.part1_small_size_threshold)
 		if (is_in_genome(part2, genome) && is_in_genome(part1, genome))
 				if (part1_loc < part2_loc)
-			return true;
+					return true;
 
 	return false;
 }
@@ -764,20 +767,20 @@ void check_for_splice(Read read, string genome, struct ParamContainer *paramcont
 			int part1_loc, part2_loc;
 			string genome_chunk = get_genome_chunk(i, read_len, genome, paramcontainer->circular_genome);
 			int splice_loc = determine_splice_loc(read_seq, genome_chunk, *paramcontainer);
+
+			// If the splice location couldn't be found (-1) or if it's clearly too large; reject
+			if ((splice_loc >= read.length()) || (splice_loc < 0))
+				continue;
+		
 			splice_loc = revise_splice_site (read_seq, genome, splice_loc);
 			
-			if (!(splice_loc > 0))
-			{
-				finished = true;
-				break;
-			}
-			if (splice_loc >= read.length())
+			// Ensure we still have a valid splice_loc
+			if ((!(splice_loc > 0)) || (splice_loc >= read.length()))
 				continue;
 			
 			part1 = read_seq.substr(0, splice_loc);
 			part2 = read_seq.substr(splice_loc);			
-
-		
+					
 			// It is known part1 is in the genome_chunk, so only consider it and then add current location(i) to the location
 			part1_loc = location_in_genome (part1, genome_chunk);
 			part1_loc = part1_loc + i;
@@ -799,18 +802,19 @@ void check_for_splice(Read read, string genome, struct ParamContainer *paramcont
 
 		}
 		
-		if ((paramcontainer->do_reverse) && (status != ON_REVERSE))
+		if ((paramcontainer->do_reverse) && (status == ON_DEFAULT))
 		{
 			reverse_read(&read_seq);
 			status = ON_REVERSE;
 		}
-		if ((paramcontainer->do_anti_sense) && (status != ON_ANTI))
+		else if ((paramcontainer->do_anti_sense) && (status == ON_REVERSE))
 		{
-
+			// Get the reverse compliment of the original string, not of the reverse
+			read_seq = read.get_sequence();
 			reverse_compliment(&read_seq);
 			status = ON_ANTI;
 		}
-		if ((status == ON_DEFAULT) || (status == ON_ANTI))
+		else if ((status == ON_DEFAULT) || (status == ON_ANTI))
 			finished = true;
 	}
 }
