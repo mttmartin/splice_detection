@@ -92,11 +92,13 @@ class Read
 
 Read::Read()
 {
-	return;
+	sequence = "";
+	frequency = 0;
 }
 Read::Read(string seq)
 {
 	this->sequence = seq;
+	frequency = 1;
 }
 
 Read::Read(string sequence, int frequency)
@@ -138,7 +140,6 @@ class ThreadPool
 	vector<function<void()>> work_queue;
 
 	mutex queue_mutex;
-
 
 	void worker();
 
