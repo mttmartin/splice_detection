@@ -44,14 +44,14 @@ struct ParamContainer
 {
     int seed_len;
     
-    int part1_small_size_threshold;
-    int part2_small_size_threshold;
-    int mM1_s_threshold;
+    unsigned int part1_small_size_threshold;
+    unsigned int part2_small_size_threshold;
+    unsigned int mM1_s_threshold;
     
     float mM1_ratio_roof;
     float mM2_ratio_floor;
     
-    int last_n_length;
+    unsigned int last_n_length;
     float last_n_mM_threshold;
 
 	int intron_min;
@@ -144,7 +144,7 @@ class ThreadPool
 
 	public:
 		ThreadPool();
-		ThreadPool(int threads_requested);
+		ThreadPool(unsigned int threads_requested);
 		void terminate();
 		void add_work(function<void()> work);
 	
@@ -154,6 +154,7 @@ class ThreadPool
 
 ThreadPool::ThreadPool()
 {
+	finished = false;
 	int thread_num = thread::hardware_concurrency();
 	for (int i=0; i < thread_num; ++i)
 	{
@@ -162,18 +163,14 @@ ThreadPool::ThreadPool()
 	
 }
 
-ThreadPool::ThreadPool(int threads_requested)
+ThreadPool::ThreadPool(unsigned int threads_requested)
 {
 	int thread_num;
+	finished = false;
 	
 	if (threads_requested > threads.max_size())
 	{
 		cout << "Error: Thread number is too large.\n";
-		exit(1);
-	}
-	else if (threads_requested < 0)
-	{
-		cerr << "Error: Thread number must be greater than 0.\n";
 		exit(1);
 	}
 	
@@ -193,7 +190,7 @@ ThreadPool::ThreadPool(int threads_requested)
 void ThreadPool::terminate()
 {
 	finished = true;
-	for (int i=0; i < threads.size(); ++i)
+	for (unsigned int i=0; i < threads.size(); ++i)
 	{
 		threads[i].join();
 	}
@@ -240,7 +237,7 @@ bool is_valid_read (string read)
 {
 	vector<char> allowed {'A', 'T', 'G', 'C'};
 	
-	for (int i=0; i < read.length(); i++)
+	for (unsigned int i=0; i < read.length(); i++)
 	{
 		if (find(allowed.begin(), allowed.end(), read[i]) != allowed.end())
 			continue;
@@ -319,7 +316,7 @@ bool get_ORFS(string filename, ParamContainer *paramcontainer)
 		
 		
 		stream << line_buffer;
-		for (int pos=0; pos < line_buffer.length(); pos++)
+		for (unsigned int pos=0; pos < line_buffer.length(); pos++)
 		{
 			if (isspace(line_buffer[pos]))
 			{
@@ -385,7 +382,7 @@ bool get_next_sequences (ifstream *file, vector<Read> &queue)
 {
 
 
-	for (int i=0; i < queue.size(); i++)
+	for (unsigned int i=0; i < queue.size(); i++)
 	{
 		string buffer;
 		int frequency=1;
@@ -438,7 +435,7 @@ int reverse_compliment(string *read)
 {
 	reverse(read->begin(), read->end());
 
-	for (int i=0; i < read->length(); i++)
+	for (unsigned int i=0; i < read->length(); i++)
 	{
 		char c = (*read)[i];
 		if (c == 'A')
@@ -504,7 +501,7 @@ bool is_in_genome (string read, string genome)
 	return false;
 }
 
-string get_genome_chunk (int loc, int read_len, string genome, bool is_circular)
+string get_genome_chunk (unsigned int loc, int read_len, string genome, bool is_circular)
 {
 	if (loc > genome.length())
 	{
@@ -547,12 +544,11 @@ int revise_splice_site (string read, string genome, int splice_site)
 	return part1.length();
 }
 
-int array_sum(int array[], int length)
+int vector_sum(vector <int> v)
 {
-    int i;
     int ret = 0;
-    for (i=0; i < length; ++i)
-        ret = ret + array[i];
+    for (int val : v)
+        ret += val;
     return ret;
 }
 
@@ -566,20 +562,12 @@ int determine_splice_loc (string seq, string chunk, struct ParamContainer paramc
     int mM1_s = 0;
     int part = 1;
     
-    int last_n_list[paramcontainer.last_n_length];
-    int last_n_iter = 0;
-    
-    int i;
-    for (i=0; i <= paramcontainer.last_n_length; ++i)
-    {
-        last_n_list[i] = 0;
-    }
+    vector <int> last_n_list(paramcontainer.last_n_length,0); 
+    unsigned int last_n_iter = 0;
     
     int splice_location = -1;
 
-    
-
-    for (i=0; i < seq.length(); i++)
+    for (unsigned int i=0; i < seq.length(); i++)
     {
         if (part == 1)
         {
@@ -603,7 +591,7 @@ int determine_splice_loc (string seq, string chunk, struct ParamContainer paramc
             if ((part1_len >= paramcontainer.part1_small_size_threshold) && ((float)mM1/part1_len > paramcontainer.mM1_ratio_roof))
                 return -1;
             
-            if ((part1_len >= paramcontainer.part1_small_size_threshold) && ((mM1_s > paramcontainer.mM1_s_threshold) || (array_sum(last_n_list, paramcontainer.last_n_length)/ (float)paramcontainer.last_n_length > paramcontainer.last_n_mM_threshold)))
+            if ((part1_len >= paramcontainer.part1_small_size_threshold) && ((mM1_s > paramcontainer.mM1_s_threshold) || (vector_sum(last_n_list)/ (float)paramcontainer.last_n_length > paramcontainer.last_n_mM_threshold)))
             {
                 i = i - mM1_s;
 				part = 2;
@@ -634,7 +622,7 @@ int determine_splice_loc (string seq, string chunk, struct ParamContainer paramc
 }
 
 	
-bool splice_is_valid (int splice_site, string part1, string part2, int part1_loc, int part2_loc, string genome, struct ParamContainer paramcontainer)
+bool splice_is_valid (string part1, string part2, int part1_loc, int part2_loc, string genome, struct ParamContainer paramcontainer)
 {
 	int intron_len = part2_loc - (part1_loc + part1.length());
 	
@@ -649,7 +637,7 @@ bool splice_is_valid (int splice_site, string part1, string part2, int part1_loc
 		bool found1 = false;
 		bool found2 = false;
 
-		for (int i=0; i < paramcontainer.cords.size(); i++)
+		for (unsigned int i=0; i < paramcontainer.cords.size(); i++)
 		{
 			int begin, end;
 			begin = paramcontainer.cords[i].begin;
@@ -695,7 +683,7 @@ void output_detected_splice (Read read, string part1, int part1_loc, int part2_l
 	string part1_ORF = ".";
 	string part2_ORF = ".";
 
-	for (int i=0; i < paramcontainer.cords.size(); i++)
+	for (unsigned int i=0; i < paramcontainer.cords.size(); i++)
 	{
 		int begin, end;
 		begin = paramcontainer.cords[i].begin;
@@ -756,9 +744,12 @@ void check_for_splice(Read read, string genome, struct ParamContainer *paramcont
 	paramcontainer->total_reads++;
 	param_mutex.unlock();
 
+	if (read_seq == "")
+		return;
+
 	while (!finished)
 	{
-		for (int i=0; i < genome.length(); i++)
+		for (unsigned int i=0; i < genome.length(); i++)
 		{
 			if ((!paramcontainer->circular_genome) && (i < genome.length()-read_len))
 				break;
@@ -787,7 +778,7 @@ void check_for_splice(Read read, string genome, struct ParamContainer *paramcont
 		
 			part2_loc = location_in_genome (part2, genome);
 
-			if (splice_is_valid (splice_loc, part1, part2, part1_loc, part2_loc, genome, *paramcontainer))
+			if (splice_is_valid (part1, part2, part1_loc, part2_loc, genome, *paramcontainer))
 			{
 				output_detected_splice(read, part1, part1_loc, part2_loc, splice_loc, status, *paramcontainer);
 				
@@ -1032,7 +1023,6 @@ int main(int argc, char *argv[])
 		done = get_next_sequences(&read_file, read_queue);
 
 		vector<thread> threads;
-
 
 		for (int i=0; i < queue_size; i++)
 		{
